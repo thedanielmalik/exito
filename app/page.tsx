@@ -5,7 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bell, BriefcaseBusiness, CalendarDays, Check, ChevronDown, CirclePlus,
   Clock3, Command, Grid2X2, LayoutDashboard, Loader2, MessageCircle,
-  MoreHorizontal, Search, Settings2, Sparkles, Trash2, Users, X, Library, Zap, Copy, ToggleLeft, ToggleRight, Plus, RefreshCw,
+  MoreHorizontal, Search, Settings2, Sparkles, Trash2, Users, X,
 } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
 
@@ -612,7 +612,7 @@ export default function Home() {
   const todo = columns.filter(c => c.name.toLowerCase() !== "completed").reduce((sum,c) => sum+c.cards.length,0);
   const navigationItems: Array<[LucideIcon, string]> = [
     [LayoutDashboard, "Overview"], [BriefcaseBusiness, "My Work"], [Grid2X2, "Boards"], [Bell, "Notifications"],
-    [CalendarDays, "Calendar"], [Users, "Team"], [Library, "Templates"], [Zap, "Automations"],
+    [CalendarDays, "Calendar"], [Users, "Team"], [Grid2X2, "Templates"], [Sparkles, "Automations"],
   ];
 
   return (
@@ -706,18 +706,18 @@ export default function Home() {
 
           {activeNav === "Templates" ? (
             <section className="my-work-panel">
-              <div className="my-work-head"><div><span className="eyebrow">Reusable workflows</span><h2>Board Templates</h2><p>Start a new board with lists, labels and custom fields already configured.</p></div><button className="secondary-button" onClick={()=>void loadTemplates()}><RefreshCw size={15}/> Refresh</button></div>
+              <div className="my-work-head"><div><span className="eyebrow">Reusable workflows</span><h2>Board Templates</h2><p>Start a new board with lists, labels and custom fields already configured.</p></div><button className="secondary-button" onClick={()=>void loadTemplates()}><Clock3 size={15}/> Refresh</button></div>
               {templatesLoading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading templates...</span></div> :
-                templates.length ? <div className="template-grid">{templates.map(t=><article className="template-card" key={t.id}><div className="template-icon">{t.icon ?? "EX"}</div><div className="template-copy"><strong>{t.name}</strong><p>{t.description}</p></div><button className="primary-button" onClick={()=>void createBoardFromTemplate(t)} disabled={saving}><Copy size={14}/> Use template</button></article>)}</div> :
-                <div className="empty-state"><Library size={25}/><strong>No templates yet</strong><p>Reusable workflows will appear here.</p></div>}
+                templates.length ? <div className="template-grid">{templates.map(t=><article className="template-card" key={t.id}><div className="template-icon">{t.icon ?? "EX"}</div><div className="template-copy"><strong>{t.name}</strong><p>{t.description}</p></div><button className="primary-button" onClick={()=>void createBoardFromTemplate(t)} disabled={saving}><CirclePlus size={14}/> Use template</button></article>)}</div> :
+                <div className="empty-state"><Grid2X2 size={25}/><strong>No templates yet</strong><p>Reusable workflows will appear here.</p></div>}
             </section>
           ) : activeNav === "Automations" ? (
             <section className="my-work-panel">
               <div className="my-work-head"><div><span className="eyebrow">Board rules</span><h2>Automations</h2><p>Let Exito perform repeatable actions when work changes.</p></div><button className="secondary-button" onClick={()=>void createAutomation()} disabled={!board}><Plus size={15}/> New automation</button></div>
-              {!board ? <div className="empty-state"><Zap size={25}/><strong>Select a board first</strong><p>Open Boards, choose a board, then return here to manage its rules.</p></div> :
-                <><div className="automation-toolbar"><span className="eyebrow">Active board</span><strong>{board.name}</strong><button className="secondary-button" onClick={()=>void loadAutomationRules()}><RefreshCw size={14}/> Refresh</button></div>
+              {!board ? <div className="empty-state"><Sparkles size={25}/><strong>Select a board first</strong><p>Open Boards, choose a board, then return here to manage its rules.</p></div> :
+                <><div className="automation-toolbar"><span className="eyebrow">Active board</span><strong>{board.name}</strong><button className="secondary-button" onClick={()=>void loadAutomationRules()}><Clock3 size={14}/> Refresh</button></div>
                 {automationsLoading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading automations...</span></div> :
-                  automationRules.length ? <div className="my-work-list">{automationRules.map(rule=><div className="my-work-item" key={rule.id}><span className="my-work-check">{rule.enabled ? <ToggleRight size={16}/> : <ToggleLeft size={16}/>}</span><span className="my-work-copy"><strong>{rule.name}</strong><small>When {rule.trigger_type.replace(/_/g," ")} → {rule.action_type.replace(/_/g," ")}</small></span><button className="icon-button" onClick={()=>void toggleAutomation(rule)}>{rule.enabled ? "On" : "Off"}</button><button className="icon-button" onClick={()=>void deleteAutomation(rule)}><Trash2 size={14}/></button></div>)}</div> :
+                  automationRules.length ? <div className="my-work-list">{automationRules.map(rule=><div className="my-work-item" key={rule.id}><span className="my-work-check">{rule.enabled ? <Check size={16}/> : <span>·</span>}</span><span className="my-work-copy"><strong>{rule.name}</strong><small>When {rule.trigger_type.replace(/_/g," ")} → {rule.action_type.replace(/_/g," ")}</small></span><button className="icon-button" onClick={()=>void toggleAutomation(rule)}>{rule.enabled ? "On" : "Off"}</button><button className="icon-button" onClick={()=>void deleteAutomation(rule)}><Trash2 size={14}/></button></div>)}</div> :
                   <div className="empty-state"><Zap size={25}/><strong>No automations yet</strong><p>Create a rule to automate repeatable board actions.</p></div>}</>}
             </section>
           ) : activeNav === "Notifications" ? (
