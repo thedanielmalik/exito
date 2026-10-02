@@ -248,10 +248,10 @@ export default function Home() {
 
   async function addWorkspaceMember() {
     if (!activeWorkspace || !userId) return;
-    const email = window.prompt("Enter the teammate's account email");
-    if (!email?.trim()) return;
-    const { data: profile } = await supabase.from("profiles").select("id,full_name").eq("email", email.trim()).maybeSingle();
-    if (!profile) { setError("No Exito user was found for that email."); return; }
+    const memberId = window.prompt("Enter the teammate's Exito user ID");
+    if (!memberId?.trim()) return;
+    const { data: profile } = await supabase.from("profiles").select("id,full_name").eq("id", memberId.trim()).maybeSingle();
+    if (!profile) { setError("No Exito user was found for that user ID."); return; }
     const { error: e } = await supabase.from("workspace_members").insert({ workspace_id: activeWorkspace.id, user_id: profile.id, role: "member" });
     if (e) setError(e.message); else await loadWorkspace(activeWorkspace);
   }
