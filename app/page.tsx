@@ -27,6 +27,9 @@ type Notification = { id: string; title: string; body: string | null; type: stri
 type DashboardCard = DbCard & { board_name: string; workspace_name: string; list_name: string };
 type DashboardMember = { user_id: string; name: string; active: number; overdue: number; completed: number };
 type DashboardActivity = Activity & { user_name: string };
+type Label = { id: string; board_id: string; name: string; color: string };
+type CustomField = { id: string; board_id: string; name: string; field_type: "text"|"number"|"select"|"date"|"checkbox"; options: string[]; position: number };
+type CustomFieldValue = { field_id: string; value: string | null };
 
 const workspaceStyle: Record<string, { initials: string; tone: string }> = {
   "WAWO Hub": { initials: "WH", tone: "sand" },
@@ -81,6 +84,10 @@ export default function Home() {
   const [dashboardMembers, setDashboardMembers] = useState<DashboardMember[]>([]);
   const [dashboardActivities, setDashboardActivities] = useState<DashboardActivity[]>([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [cardLabelIds, setCardLabelIds] = useState<string[]>([]);
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customValues, setCustomValues] = useState<Record<string,string>>({});
 
   async function loadBoard(nextBoard: Board, workspace: Workspace) {
     setBoard(nextBoard);
@@ -252,11 +259,14 @@ export default function Home() {
   }
 
   async function loadCardDetails(card: DbCard) {
-    const [commentRes, checklistRes, memberRes, activityRes] = await Promise.all([
+    const [commentRes, checklistRes, memberRes, activityRes, labelRes, fieldRes] = await Promise.all([
+      supabase.from("card_labels").select("label_id").eq("card_id", card.id),
       supabase.from("comments").select("id,user_id,body,created_at").eq("card_id", card.id).order("created_at", { ascending: true }),
       supabase.from("checklists").select("id,card_id,name").eq("card_id", card.id).order("created_at", { ascending: true }),
       supabase.from("card_members").select("user_id").eq("card_id", card.id),
       supabase.from("activities").select("id,user_id,action_type,metadata,created_at").eq("card_id", card.id).order("created_at", { ascending: false }).limit(30),
+      supabase.from("card_custom_field_values").select("field_id,value").eq("card_id", card.id),
+    ]);
     ]);
     const checklistIds = (checklistRes.data ?? []).map(x => x.id);
     const itemRes = checklistIds.length
@@ -267,11 +277,57 @@ export default function Home() {
     setChecklistItems(itemRes.data ?? []);
     setAssignedIds((memberRes.data ?? []).map(x => x.user_id));
     setActivities(activityRes.data ?? []);
+    setCardLabelIds((labelRes.data ?? []).map(x => x.label_id));
+    setCustomValues(Object.fromEntries((fieldRes.data ?? []).map(x => [x.field_id, x.value ?? ""])));
   }
 
   async function openCard(card: DbCard) {
+    const [{ data: boardLabels }, { data: fields }] = await Promise.all([
+      supabase.from("labels").select("id,board_id,name,color").eq("board_id", card.board_id).order("created_at", { ascending: true }),
+      supabase.from("custom_fields").select("id,board_id,name,field_type,options,position").eq("board_id", card.board_id).order("position", { ascending: true })
+    ]);
+    setLabels((boardLabels ?? []) as Label[]);
+    setCustomFields((fields ?? []).map(f => ({...f, options: Array.isArray(f.options) ? f.options as string[] : []})) as CustomField[]);
     setSelectedCard(card);
     await loadCardDetails(card);
+  }
+
+  async function toggleCardLabel(label: Label) {
+    if (!selectedCard) return;
+    if (cardLabelIds.includes(label.id)) {
+      const { error: e } = await supabase.from("card_labels").delete().eq("card_id", selectedCard.id).eq("label_id", label.id);
+      if (e) setError(e.message); else { setCardLabelIds(prev => prev.filter(id => id !== label.id)); await logActivity(selectedCard, "label_removed", {label: label.name}); }
+    } else {
+      const { error: e } = await supabase.from("card_labels").insert({card_id:selectedCard.id,label_id:label.id});
+      if (e) setError(e.message); else { setCardLabelIds(prev => [...prev,label.id]); await logActivity(selectedCard, "label_added", {label: label.name}); }
+    }
+  }
+
+  async function createBoardLabel() {
+    if (!board) return;
+    const name = window.prompt("Label name");
+    if (!name?.trim()) return;
+    const color = window.prompt("Label color (hex)", "#635bff") || "#635bff";
+    const { data, error: e } = await supabase.from("labels").insert({board_id:board.id,name:name.trim(),color}).select("id,board_id,name,color").single();
+    if (e) setError(e.message); else if (data) setLabels(prev => [...prev,data]);
+  }
+
+  async function createCustomField() {
+    if (!board) return;
+    const name = window.prompt("Custom field name");
+    if (!name?.trim()) return;
+    const type = (window.prompt("Type: text, number, select, date, checkbox", "text") || "text").toLowerCase();
+    if (!["text","number","select","date","checkbox"].includes(type)) { setError("Use text, number, select, date, or checkbox."); return; }
+    let options: string[] = [];
+    if (type === "select") options = (window.prompt("Select options, separated by commas") || "").split(",").map(x=>x.trim()).filter(Boolean);
+    const { data, error: e } = await supabase.from("custom_fields").insert({board_id:board.id,name:name.trim(),field_type:type,options}).select("id,board_id,name,field_type,options,position").single();
+    if (e) setError(e.message); else if (data) setCustomFields(prev => [...prev, {...data, options:Array.isArray(data.options)?data.options:[]} as CustomField]);
+  }
+
+  async function saveCustomValue(field: CustomField, value: string) {
+    if (!selectedCard) return;
+    const { error: e } = await supabase.from("card_custom_field_values").upsert({card_id:selectedCard.id,field_id:field.id,value,updated_at:new Date().toISOString()});
+    if (e) setError(e.message); else setCustomValues(prev => ({...prev,[field.id]:value}));
   }
 
   async function updateCard(patch: Partial<DbCard>, action: string, metadata: Record<string, unknown> = {}) {
@@ -600,6 +656,12 @@ export default function Home() {
               <div className="drawer-field"><label>Due date</label><input type="date" value={selectedCard.due_date ? selectedCard.due_date.slice(0,10) : ""} onChange={e=>void updateCard({due_date:e.target.value ? new Date(e.target.value+"T23:59:00").toISOString() : null},"due_date_updated")}/></div>
             </div>
 
+            <div className="drawer-section"><div className="drawer-section-head"><h3>Labels</h3><button className="text-button" onClick={()=>void createBoardLabel()}>+ New label</button></div>
+              <div className="label-manager">{labels.map(label=><button key={label.id} className={cardLabelIds.includes(label.id)?"card-label selected":"card-label"} style={{"--label-color":label.color} as React.CSSProperties} onClick={()=>void toggleCardLabel(label)}>{label.name}</button>)}{!labels.length&&<span className="drawer-muted">No labels yet. Create one for this board.</span>}</div>
+            </div>
+            <div className="drawer-section"><div className="drawer-section-head"><h3>Custom fields</h3><button className="text-button" onClick={()=>void createCustomField()}>+ Add field</button></div>
+              <div className="custom-field-list">{customFields.map(field=>{const value=customValues[field.id]??""; return <div className="custom-field-row" key={field.id}><label>{field.name}</label>{field.field_type==="select"?<select value={value} onChange={e=>void saveCustomValue(field,e.target.value)}><option value="">Select...</option>{field.options.map(o=><option key={o} value={o}>{o}</option>)}</select>:field.field_type==="checkbox"?<input type="checkbox" checked={value==="true"} onChange={e=>void saveCustomValue(field,e.target.checked?"true":"false")}/>:<input type={field.field_type==="date"?"date":field.field_type==="number"?"number":"text"} value={value} onChange={e=>setCustomValues(prev=>({...prev,[field.id]:e.target.value}))} onBlur={()=>void saveCustomValue(field,customValues[field.id]??"")} placeholder={"Enter "+field.name.toLowerCase()}/>}</div>})}{!customFields.length&&<span className="drawer-muted">Add fields such as Client, Amount, Priority or Payment Status.</span>}</div>
+            </div>
             <div className="drawer-section"><div className="drawer-section-head"><h3>People</h3><Users size={15}/></div>
               <div className="member-list">{members.map(m=><label className="member-row" key={m.user_id}><input type="checkbox" checked={assignedIds.includes(m.user_id)} onChange={()=>void toggleAssignment(m.user_id)}/><span className="assignee">{initials(m.name)}</span><span>{m.name}</span></label>)}</div>
             </div>
