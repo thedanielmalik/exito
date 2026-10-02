@@ -215,3 +215,8 @@ button:disabled { opacity: .55; cursor: wait; }
 .my-work-copy small { color: #949caa; font-size: 9px; }
 .my-work-date { color: #858e9d; font-size: 9px; white-space: nowrap; }
 @media (max-width: 600px) { .my-work-head { align-items: flex-start; flex-direction: column; } .my-work-date { display: none; } }
+
+.notification-button { position: relative; }
+.notification-dot { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: #635bff; border: 1px solid #fff; }
+.notification-unread { background: #f7f6ff; }
+.notification-unread:hover { background: #f0efff; }
