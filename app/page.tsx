@@ -267,7 +267,6 @@ export default function Home() {
       supabase.from("activities").select("id,user_id,action_type,metadata,created_at").eq("card_id", card.id).order("created_at", { ascending: false }).limit(30),
       supabase.from("card_custom_field_values").select("field_id,value").eq("card_id", card.id),
     ]);
-    ]);
     const checklistIds = (checklistRes.data ?? []).map(x => x.id);
     const itemRes = checklistIds.length
       ? await supabase.from("checklist_items").select("id,checklist_id,name,is_completed").in("checklist_id", checklistIds)
