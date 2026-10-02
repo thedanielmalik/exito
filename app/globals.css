@@ -147,3 +147,51 @@ button { border: 0; cursor: pointer; }
 button:disabled { opacity: .55; cursor: wait; }
 .spin { animation: exito-spin 1s linear infinite; }
 @keyframes exito-spin { to { transform: rotate(360deg); } }
+
+.add-list-column { min-height: 90px; border: 1px dashed #d4d8e1; border-radius: 12px; background: rgba(255,255,255,.45); color: #8a92a0; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 11px; font-weight: 700; min-width: 220px; }
+.add-list-column:hover { background: #fff; color: #4f5664; border-color: #c2c7d2; }
+.task-card { cursor: grab; }
+.task-card:active { cursor: grabbing; }
+.drawer-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(12,16,25,.38); display: flex; justify-content: flex-end; }
+.card-drawer { width: min(590px, 100%); height: 100%; background: #fff; box-shadow: -20px 0 60px rgba(20,25,40,.16); display: flex; flex-direction: column; animation: drawer-in .18s ease-out; }
+.drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--line); }
+.drawer-header h2 { margin: 3px 0 0; font-size: 18px; letter-spacing: -.4px; }
+.drawer-body { overflow-y: auto; padding: 24px; }
+.drawer-title { width: 100%; border: 0; outline: 0; font-size: 24px; font-weight: 800; letter-spacing: -1px; color: var(--ink); padding: 0; margin-bottom: 20px; }
+.drawer-title:focus { box-shadow: 0 2px 0 #7b73ff; }
+.drawer-field { display: grid; gap: 7px; margin-bottom: 17px; }
+.drawer-field label, .drawer-section-head h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #7d8696; font-weight: 800; margin: 0; }
+.drawer-field textarea, .drawer-field select, .drawer-field input, .inline-add input, .comment-box textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fafbfc; outline: 0; padding: 10px 11px; font-size: 12px; color: var(--ink); }
+.drawer-field textarea { min-height: 100px; resize: vertical; line-height: 1.55; }
+.drawer-field select, .drawer-field input { height: 40px; }
+.drawer-field textarea:focus, .drawer-field select:focus, .drawer-field input:focus, .inline-add input:focus, .comment-box textarea:focus { border-color: #aaa5ff; box-shadow: 0 0 0 3px rgba(99,91,255,.08); }
+.drawer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.drawer-section { border-top: 1px solid var(--line); padding-top: 19px; margin-top: 18px; }
+.drawer-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; color: #697285; }
+.member-list, .activity-list, .comments { display: grid; gap: 7px; }
+.member-row { display: flex; align-items: center; gap: 9px; padding: 7px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+.member-row:hover { background: #f7f8fa; }
+.member-row input, .check-row input { accent-color: var(--accent); }
+.checklist { border: 1px solid var(--line); border-radius: 9px; padding: 11px; margin-bottom: 9px; }
+.checklist > strong { display: block; font-size: 11px; margin-bottom: 8px; }
+.check-row { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: 11px; color: #505969; }
+.checked-text { text-decoration: line-through; color: #a1a7b2; }
+.inline-add { display: flex; gap: 6px; margin-top: 8px; }
+.inline-add button { width: 37px; border-radius: 8px; background: #f0efff; color: #5952c5; display: grid; place-items: center; }
+.comment { display: flex; gap: 9px; padding: 9px 0; }
+.comment-avatar { width: 28px; height: 28px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; background: #eef0ff; color: #5751b8; font-size: 8px; font-weight: 800; }
+.comment strong { font-size: 11px; }
+.comment p { margin: 4px 0; font-size: 11px; line-height: 1.5; color: #535c6c; }
+.comment small, .activity-row small { display: block; color: #a0a6b1; font-size: 8px; }
+.comment-box { display: grid; gap: 7px; margin-top: 8px; }
+.comment-box textarea { min-height: 70px; resize: vertical; }
+.comment-box .primary-button { justify-content: center; }
+.activity-row { display: flex; gap: 9px; align-items: flex-start; font-size: 10px; color: #687181; padding: 5px 0; }
+.activity-row strong { color: #343c4b; }
+.activity-dot { width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: #9c97ff; flex: 0 0 auto; }
+@keyframes drawer-in { from { transform: translateX(20px); opacity: .7; } to { transform: translateX(0); opacity: 1; } }
+@media (max-width: 700px) {
+  .card-drawer { width: 100%; }
+  .drawer-grid { grid-template-columns: 1fr; }
+  .add-list-column { min-width: 260px; }
+}
