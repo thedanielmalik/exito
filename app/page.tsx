@@ -23,6 +23,7 @@ type Comment = { id: string; user_id: string | null; body: string; created_at: s
 type Checklist = { id: string; card_id: string; name: string };
 type ChecklistItem = { id: string; checklist_id: string; name: string; is_completed: boolean };
 type Activity = { id: string; user_id: string | null; action_type: string; metadata: Record<string, unknown>; created_at: string };
+type Notification = { id: string; title: string; body: string | null; type: string; entity_type: string | null; entity_id: string | null; read_at: string | null; created_at: string };
 
 const workspaceStyle: Record<string, { initials: string; tone: string }> = {
   "WAWO Hub": { initials: "WH", tone: "sand" },
@@ -72,6 +73,7 @@ export default function Home() {
   const [newChecklistName, setNewChecklistName] = useState("");
   const [dragCardId, setDragCardId] = useState<string | null>(null);
   const [myWork, setMyWork] = useState<Array<DbCard & { board_name: string; workspace_name: string; list_name: string }>>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   async function loadBoard(nextBoard: Board, workspace: Workspace) {
     setBoard(nextBoard);
@@ -116,6 +118,20 @@ export default function Home() {
     const current = board && nextBoards.some(b => b.id === board.id) ? board : nextBoards[0];
     await loadBoard(current, workspace);
   }
+  async function loadNotifications() {
+    if (!userId) return;
+    const { data, error: e } = await supabase.from("notifications")
+      .select("id,title,body,type,entity_type,entity_id,read_at,created_at")
+      .eq("user_id", userId).order("created_at", { ascending: false }).limit(50);
+    if (!e) setNotifications(data ?? []);
+  }
+
+  async function markNotificationRead(notification: Notification) {
+    if (notification.read_at) return;
+    const { error: e } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", notification.id);
+    if (!e) setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, read_at: new Date().toISOString() } : n));
+  }
+
   async function loadMyWork() {
     if (!userId) return;
     const { data: memberships } = await supabase.from("card_members").select("card_id").eq("user_id", userId);
@@ -169,6 +185,7 @@ export default function Home() {
   useEffect(() => {
     if (!userId) return;
     void loadMyWork();
+    void loadNotifications();
   }, [userId]);
 
   useEffect(() => {
@@ -333,7 +350,7 @@ export default function Home() {
   const completed = columns.find(c => c.name.toLowerCase() === "completed")?.cards.length ?? 0;
   const todo = columns.filter(c => c.name.toLowerCase() !== "completed").reduce((sum,c) => sum+c.cards.length,0);
   const navigationItems: Array<[LucideIcon, string]> = [
-    [LayoutDashboard, "Overview"], [BriefcaseBusiness, "My Work"], [Grid2X2, "Boards"],
+    [LayoutDashboard, "Overview"], [BriefcaseBusiness, "My Work"], [Grid2X2, "Boards"], [Bell, "Notifications"],
     [CalendarDays, "Calendar"], [Users, "Team"],
   ];
 
@@ -368,7 +385,7 @@ export default function Home() {
           <div className="breadcrumbs"><span>Exito</span><span>/</span><strong>{activeWorkspace?.name ?? "Workspace"}</strong></div>
           <div className="top-actions">
             <label className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search work..."/><kbd><Command size={12}/> K</kbd></label>
-            <button className="icon-button"><Bell size={18}/></button><div className="top-avatar">{initials(userName)}</div>
+            <button className="icon-button notification-button" onClick={()=>setActiveNav("Notifications")} aria-label="Notifications"><Bell size={18}/>{notifications.some(n=>!n.read_at) && <span className="notification-dot" />}</button><div className="top-avatar">{initials(userName)}</div>
           </div>
         </header>
 
@@ -405,6 +422,14 @@ export default function Home() {
             </div>
           </div>
 
+          {activeNav === "Notifications" ? (
+            <section className="my-work-panel">
+              <div className="my-work-head"><div><span className="eyebrow">Updates</span><h2>Notifications</h2><p>Important activity and updates sent to you.</p></div><button className="secondary-button" onClick={()=>void loadNotifications()}><Bell size={15}/> Refresh</button></div>
+              {notifications.length ? <div className="my-work-list">{notifications.map(n=><button key={n.id} className={n.read_at ? "my-work-item" : "my-work-item notification-unread"} onClick={()=>void markNotificationRead(n)}>
+                <span className="my-work-check"><Bell size={13}/></span><span className="my-work-copy"><strong>{n.title}</strong><small>{n.body ?? n.type} · {new Date(n.created_at).toLocaleString("en-NG")}</small></span><span className="my-work-date">{n.read_at ? "Read" : "New"}</span>
+              </button>)}</div> : <div className="empty-state"><Bell size={25}/><strong>You're all caught up</strong><p>New assignments, comments and important updates will appear here.</p></div>}
+            </section>
+          ) :
           {activeNav === "My Work" ? (
             <section className="my-work-panel">
               <div className="my-work-head"><div><span className="eyebrow">Assigned to you</span><h2>My Work</h2><p>Everything currently assigned to you across Exito.</p></div><button className="secondary-button" onClick={()=>void loadMyWork()}><Clock3 size={15}/> Refresh</button></div>
