@@ -5,7 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bell, BriefcaseBusiness, CalendarDays, Check, ChevronDown, CirclePlus,
   Clock3, Command, Grid2X2, LayoutDashboard, Loader2, MessageCircle,
-  MoreHorizontal, Search, Settings2, Sparkles, Trash2, Users, X,
+  MoreHorizontal, Search, Settings2, Sparkles, Trash2, Users, X, Library, Zap, Copy, ToggleLeft, ToggleRight, Plus, WandSparkles, Table2, ListChecks, Bot, RefreshCw, Archive, ArchiveRestore,
 } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
 
@@ -30,6 +30,8 @@ type DashboardActivity = Activity & { user_name: string };
 type Label = { id: string; board_id: string; name: string; color: string };
 type CustomField = { id: string; board_id: string; name: string; field_type: "text"|"number"|"select"|"date"|"checkbox"; options: string[]; position: number };
 type CustomFieldValue = { field_id: string; value: string | null };
+type BoardTemplate = { id: string; name: string; description: string | null; icon: string | null; created_at: string };
+type AutomationRule = { id: string; board_id: string; name: string; trigger_type: string; action_type: string; config: Record<string, unknown>; enabled: boolean };
 
 const workspaceStyle: Record<string, { initials: string; tone: string }> = {
   "WAWO Hub": { initials: "WH", tone: "sand" },
@@ -88,6 +90,10 @@ export default function Home() {
   const [cardLabelIds, setCardLabelIds] = useState<string[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customValues, setCustomValues] = useState<Record<string,string>>({});
+  const [templates, setTemplates] = useState<BoardTemplate[]>([]);
+  const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [automationsLoading, setAutomationsLoading] = useState(false);
 
   async function loadBoard(nextBoard: Board, workspace: Workspace) {
     setBoard(nextBoard);
@@ -338,6 +344,7 @@ export default function Home() {
     else {
       setSelectedCard(data);
       await logActivity(data, action, metadata);
+      if (action === "card_completed") await runAutomationRules("card_completed", data);
       await loadWorkspace(activeWorkspace!);
     }
     setSaving(false);
@@ -400,6 +407,110 @@ export default function Home() {
     setSaving(false);
   }
 
+  async function loadTemplates() {
+    if (!orgId) return;
+    setTemplatesLoading(true);
+    const { data, error: e } = await supabase.from("board_templates")
+      .select("id,name,description,icon,created_at").eq("organization_id", orgId).order("created_at", { ascending: true });
+    if (e) setError(e.message); else setTemplates((data ?? []) as BoardTemplate[]);
+    setTemplatesLoading(false);
+  }
+
+  async function loadAutomationRules() {
+    if (!board) return;
+    setAutomationsLoading(true);
+    const { data, error: e } = await supabase.from("automation_rules")
+      .select("id,board_id,name,trigger_type,action_type,config,enabled").eq("board_id", board.id).order("created_at", { ascending: true });
+    if (e) setError(e.message); else setAutomationRules((data ?? []) as AutomationRule[]);
+    setAutomationsLoading(false);
+  }
+
+  async function createBoardFromTemplate(template: BoardTemplate) {
+    if (!activeWorkspace || !userId) return;
+    setSaving(true); setError("");
+    const { data: templateLists, error: listsError } = await supabase.from("board_template_lists")
+      .select("name,position").eq("template_id", template.id).order("position", { ascending: true });
+    if (listsError) { setError(listsError.message); setSaving(false); return; }
+    const { data: templateLabels, error: labelsError } = await supabase.from("board_template_labels")
+      .select("name,color").eq("template_id", template.id);
+    if (labelsError) { setError(labelsError.message); setSaving(false); return; }
+    const { data: templateFields, error: fieldsError } = await supabase.from("board_template_fields")
+      .select("name,field_type,options,position").eq("template_id", template.id).order("position", { ascending: true });
+    if (fieldsError) { setError(fieldsError.message); setSaving(false); return; }
+
+    const boardName = window.prompt("Board name", template.name.replace(/^.*?—\s*/, "").trim()) || template.name;
+    const { data: newBoard, error: boardError } = await supabase.from("boards")
+      .insert({ workspace_id: activeWorkspace.id, name: boardName.trim(), description: template.description, created_by: userId })
+      .select("id,workspace_id,name,description,background,visibility").single();
+    if (boardError || !newBoard) { setError(boardError?.message ?? "Could not create board."); setSaving(false); return; }
+
+    const { data: createdLists, error: createListsError } = await supabase.from("lists").insert(
+      (templateLists ?? []).map(l => ({ board_id: newBoard.id, name: l.name, position: l.position }))
+    ).select("id,name,position");
+    if (createListsError) { setError(createListsError.message); setSaving(false); return; }
+
+    if ((templateLabels ?? []).length) {
+      const { error: e } = await supabase.from("labels").insert((templateLabels ?? []).map(l => ({ board_id: newBoard.id, name: l.name, color: l.color })));
+      if (e) setError(e.message);
+    }
+    if ((templateFields ?? []).length) {
+      const { error: e } = await supabase.from("custom_fields").insert((templateFields ?? []).map(f => ({ board_id: newBoard.id, name: f.name, field_type: f.field_type, options: f.options, position: f.position })));
+      if (e) setError(e.message);
+    }
+    setBoards(prev => [...prev, newBoard]);
+    setBoard(newBoard);
+    setActiveNav("Boards");
+    await loadBoard(newBoard, activeWorkspace);
+    setSaving(false);
+  }
+
+  async function createAutomation() {
+    if (!board || !userId) return;
+    const name = window.prompt("Automation name", "When a card is completed");
+    if (!name?.trim()) return;
+    const trigger = (window.prompt("Trigger: card_created, card_moved, card_completed, due_date_approaching", "card_completed") || "card_completed").trim();
+    const action = (window.prompt("Action: move_card, add_label, assign_member, create_comment", "move_card") || "move_card").trim();
+    const configText = window.prompt("Config JSON", "{}") || "{}";
+    let config: Record<string, unknown>;
+    try { config = JSON.parse(configText); } catch { setError("Automation config must be valid JSON."); return; }
+    if (!["card_created","card_moved","card_completed","due_date_approaching"].includes(trigger)) { setError("Invalid automation trigger."); return; }
+    if (!["move_card","add_label","assign_member","create_comment"].includes(action)) { setError("Invalid automation action."); return; }
+    const { data, error: e } = await supabase.from("automation_rules").insert({
+      board_id: board.id, name: name.trim(), trigger_type: trigger, action_type: action, config, enabled: true, created_by: userId
+    }).select("id,board_id,name,trigger_type,action_type,config,enabled").single();
+    if (e) setError(e.message); else if (data) setAutomationRules(prev => [...prev, data as AutomationRule]);
+  }
+
+  async function toggleAutomation(rule: AutomationRule) {
+    const { error: e } = await supabase.from("automation_rules").update({ enabled: !rule.enabled }).eq("id", rule.id);
+    if (e) setError(e.message); else setAutomationRules(prev => prev.map(r => r.id === rule.id ? {...r, enabled: !r.enabled} : r));
+  }
+
+  async function deleteAutomation(rule: AutomationRule) {
+    if (!window.confirm(`Delete automation "${rule.name}"?`)) return;
+    const { error: e } = await supabase.from("automation_rules").delete().eq("id", rule.id);
+    if (e) setError(e.message); else setAutomationRules(prev => prev.filter(r => r.id !== rule.id));
+  }
+
+  async function runAutomationRules(trigger: string, card: DbCard, context: Record<string, unknown> = {}) {
+    if (!board) return;
+    const { data: rules } = await supabase.from("automation_rules").select("id,name,trigger_type,action_type,config,enabled").eq("board_id", card.board_id).eq("trigger_type", trigger).eq("enabled", true);
+    for (const rule of (rules ?? []) as AutomationRule[]) {
+      const cfg = rule.config ?? {};
+      if (rule.action_type === "move_card" && typeof cfg.list_id === "string") {
+        await supabase.from("cards").update({ list_id: cfg.list_id }).eq("id", card.id);
+      } else if (rule.action_type === "add_label" && typeof cfg.label_id === "string") {
+        await supabase.from("card_labels").upsert({ card_id: card.id, label_id: cfg.label_id });
+      } else if (rule.action_type === "assign_member" && typeof cfg.user_id === "string") {
+        await supabase.from("card_members").upsert({ card_id: card.id, user_id: cfg.user_id });
+      } else if (rule.action_type === "create_comment" && typeof cfg.body === "string") {
+        await supabase.from("comments").insert({ card_id: card.id, user_id: userId, body: cfg.body });
+      }
+      await logActivity(card, "automation_executed", { rule: rule.name, trigger, context });
+    }
+    if ((rules ?? []).length) await loadWorkspace(activeWorkspace!);
+  }
+
   async function addCard(columnId: string) {
     if (!board || !userId) return;
     const title = window.prompt("What should we work on?");
@@ -412,6 +523,7 @@ export default function Home() {
     }).select("id,board_id,list_id,title,description,position,created_at,due_date,is_archived,completed_at").single();
     if (insertError) setError(insertError.message);
     else if (data) await logActivity(data, "card_created");
+    if (!insertError && data) await runAutomationRules("card_created", data);
     if (!insertError) await loadWorkspace(activeWorkspace!);
     setSaving(false);
   }
@@ -494,7 +606,7 @@ export default function Home() {
   const todo = columns.filter(c => c.name.toLowerCase() !== "completed").reduce((sum,c) => sum+c.cards.length,0);
   const navigationItems: Array<[LucideIcon, string]> = [
     [LayoutDashboard, "Overview"], [BriefcaseBusiness, "My Work"], [Grid2X2, "Boards"], [Bell, "Notifications"],
-    [CalendarDays, "Calendar"], [Users, "Team"],
+    [CalendarDays, "Calendar"], [Users, "Team"], [Library, "Templates"], [Zap, "Automations"],
   ];
 
   return (
@@ -586,7 +698,23 @@ export default function Home() {
             </div>
           </div>}
 
-          {activeNav === "Notifications" ? (
+          {activeNav === "Templates" ? (
+            <section className="my-work-panel">
+              <div className="my-work-head"><div><span className="eyebrow">Reusable workflows</span><h2>Board Templates</h2><p>Start a new board with lists, labels and custom fields already configured.</p></div><button className="secondary-button" onClick={()=>void loadTemplates()}><RefreshCw size={15}/> Refresh</button></div>
+              {templatesLoading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading templates...</span></div> :
+                templates.length ? <div className="template-grid">{templates.map(t=><article className="template-card" key={t.id}><div className="template-icon">{t.icon ?? "EX"}</div><div className="template-copy"><strong>{t.name}</strong><p>{t.description}</p></div><button className="primary-button" onClick={()=>void createBoardFromTemplate(t)} disabled={saving}><Copy size={14}/> Use template</button></article>)}</div> :
+                <div className="empty-state"><Library size={25}/><strong>No templates yet</strong><p>Reusable workflows will appear here.</p></div>}
+            </section>
+          ) : activeNav === "Automations" ? (
+            <section className="my-work-panel">
+              <div className="my-work-head"><div><span className="eyebrow">Board rules</span><h2>Automations</h2><p>Let Exito perform repeatable actions when work changes.</p></div><button className="secondary-button" onClick={()=>void createAutomation()} disabled={!board}><Plus size={15}/> New automation</button></div>
+              {!board ? <div className="empty-state"><Zap size={25}/><strong>Select a board first</strong><p>Open Boards, choose a board, then return here to manage its rules.</p></div> :
+                <><div className="automation-toolbar"><span className="eyebrow">Active board</span><strong>{board.name}</strong><button className="secondary-button" onClick={()=>void loadAutomationRules()}><RefreshCw size={14}/> Refresh</button></div>
+                {automationsLoading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading automations...</span></div> :
+                  automationRules.length ? <div className="my-work-list">{automationRules.map(rule=><div className="my-work-item" key={rule.id}><span className="my-work-check">{rule.enabled ? <ToggleRight size={16}/> : <ToggleLeft size={16}/>}</span><span className="my-work-copy"><strong>{rule.name}</strong><small>When {rule.trigger_type.replace(/_/g," ")} → {rule.action_type.replace(/_/g," ")}</small></span><button className="icon-button" onClick={()=>void toggleAutomation(rule)}>{rule.enabled ? "On" : "Off"}</button><button className="icon-button" onClick={()=>void deleteAutomation(rule)}><Trash2 size={14}/></button></div>)}</div> :
+                  <div className="empty-state"><Zap size={25}/><strong>No automations yet</strong><p>Create a rule to automate repeatable board actions.</p></div>}</>}
+            </section>
+          ) : activeNav === "Notifications" ? (
             <section className="my-work-panel">
               <div className="my-work-head"><div><span className="eyebrow">Updates</span><h2>Notifications</h2><p>Important activity and updates sent to you.</p></div><button className="secondary-button" onClick={()=>void loadNotifications()}><Bell size={15}/> Refresh</button></div>
               {notifications.length ? <div className="my-work-list">{notifications.map(n=><button key={n.id} className={n.read_at ? "my-work-item" : "my-work-item notification-unread"} onClick={()=>void markNotificationRead(n)}>
