@@ -220,3 +220,6 @@ button:disabled { opacity: .55; cursor: wait; }
 .notification-dot { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: #635bff; border: 1px solid #fff; }
 .notification-unread { background: #f7f6ff; }
 .notification-unread:hover { background: #f0efff; }
+
+.side-add { display: grid; place-items: center; background: transparent; color: #697388; padding: 0; }
+.side-add:hover { color: #fff; }
