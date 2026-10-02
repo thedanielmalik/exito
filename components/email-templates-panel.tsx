@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, Image as ImageIcon, Mail, Monitor, PlayCircle, Plus, Save, Search, Smartphone, X } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
 
@@ -103,7 +103,7 @@ export default function EmailTemplatesPanel({ orgId, userId }: { orgId: string |
     setLoading(false);
   }
 
-  useState(() => { void loadTemplates(); });
+  useEffect(() => { void loadTemplates(); }, [orgId]);
 
   const categories = ["All", ...Array.from(new Set(templates.map(t => t.category)))];
   const filtered = templates.filter(t => {
