@@ -429,8 +429,7 @@ export default function Home() {
                 <span className="my-work-check"><Bell size={13}/></span><span className="my-work-copy"><strong>{n.title}</strong><small>{n.body ?? n.type} · {new Date(n.created_at).toLocaleString("en-NG")}</small></span><span className="my-work-date">{n.read_at ? "Read" : "New"}</span>
               </button>)}</div> : <div className="empty-state"><Bell size={25}/><strong>You're all caught up</strong><p>New assignments, comments and important updates will appear here.</p></div>}
             </section>
-          ) :
-          {activeNav === "My Work" ? (
+          ) : activeNav === "My Work" ? (
             <section className="my-work-panel">
               <div className="my-work-head"><div><span className="eyebrow">Assigned to you</span><h2>My Work</h2><p>Everything currently assigned to you across Exito.</p></div><button className="secondary-button" onClick={()=>void loadMyWork()}><Clock3 size={15}/> Refresh</button></div>
               {myWork.length ? <div className="my-work-list">{myWork.map(card => <button key={card.id} className="my-work-item" onClick={()=>{setActiveNav("Overview"); const b=boards.find(x=>x.id===card.board_id); if(b&&activeWorkspace) void loadBoard(b,activeWorkspace); void openCard(card);}}>
