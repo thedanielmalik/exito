@@ -10,7 +10,7 @@ import {
 import { createClient } from "../lib/supabase/client";
 
 type Workspace = { id: string; name: string; icon: string | null };
-type Board = { id: string; workspace_id: string; name: string };
+type Board = { id: string; workspace_id: string; name: string; description?: string | null; background?: string | null; visibility?: string | null };
 type List = { id: string; board_id: string; name: string; position: number };
 type DbCard = {
   id: string; board_id: string; list_id: string; title: string;
@@ -107,7 +107,7 @@ export default function Home() {
     setSelectedCard(null);
 
     const { data: boardRows, error: boardError } = await supabase
-      .from("boards").select("id,workspace_id,name").eq("workspace_id", workspace.id)
+      .from("boards").select("id,workspace_id,name,description,background,visibility").eq("workspace_id", workspace.id)
       .is("archived_at", null).order("created_at", { ascending: true });
     if (boardError) { setError(boardError.message); setLoading(false); return; }
 
@@ -244,6 +244,23 @@ export default function Home() {
     setSaving(false);
   }
 
+  async function updateBoardSettings() {
+    if (!board) return;
+    const name = window.prompt("Board name", board.name);
+    if (!name?.trim()) return;
+    const description = window.prompt("Board description", board.description ?? "") ?? board.description ?? null;
+    const { data, error: e } = await supabase.from("boards").update({ name: name.trim(), description }).eq("id", board.id)
+      .select("id,workspace_id,name,description,background,visibility").single();
+    if (e) setError(e.message); else if (data) { setBoard(data); setBoards(prev => prev.map(b => b.id === data.id ? data : b)); }
+  }
+
+  async function archiveBoard() {
+    if (!board || !activeWorkspace) return;
+    if (!window.confirm(`Archive "${board.name}"?`)) return;
+    const { error: e } = await supabase.from("boards").update({ archived_at: new Date().toISOString() }).eq("id", board.id);
+    if (e) setError(e.message); else { setBoard(null); await loadWorkspace(activeWorkspace); }
+  }
+
   async function createBoard() {
     if (!activeWorkspace || !userId) return;
     const name = window.prompt("Name your board");
@@ -375,7 +392,7 @@ export default function Home() {
           })}
         </div>
         <div className="sidebar-bottom">
-          <button className="nav-item"><Settings2 size={18}/><span>Settings</span></button>
+          <button className="nav-item" onClick={()=>board && void updateBoardSettings()}><Settings2 size={18}/><span>Settings</span></button>
           <div className="user-chip"><div className="user-avatar">{initials(userName)}</div><div><strong>{userName}</strong><span>Owner</span></div><MoreHorizontal size={17}/></div>
         </div>
       </aside>
@@ -412,7 +429,7 @@ export default function Home() {
               }}>
                 {boards.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
-              <button className="secondary-button" onClick={()=>void createBoard()}><CirclePlus size={15}/> New board</button>
+              <button className="secondary-button" onClick={()=>void updateBoardSettings()}><Settings2 size={15}/> Board settings</button><button className="secondary-button" onClick={()=>void createBoard()}><CirclePlus size={15}/> New board</button>
             </div>}
             <div className="view-actions">
               <button className="view-button active"><Grid2X2 size={15}/> Board</button>
