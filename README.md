@@ -30,7 +30,6 @@ GitHub is the source of truth. Lovable is used for rapid UI/application iteratio
 
 See docs/product-blueprint.md and docs/development-rules.md.
 
-
 ## Deployment
 
 ### Supabase
@@ -43,4 +42,6 @@ Do not commit secrets. The service-role key is server-only and is not required b
 ### Vercel
 Connect the repository `thedanielmalik/exito` to a Vercel project and set the two public Supabase variables above for Production, Preview, and Development as appropriate. Then deploy the default branch.
 
-The current Exito repository is intentionally deployment-ready but does not contain Vercel project IDs or credentials.
+The current Exito repository is intentionally deployment-ready and does not contain Vercel project IDs or credentials.
+
+Deployment integration verified: the Exito Vercel project is connected to the GitHub repository, and the main branch is the production source.
