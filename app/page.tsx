@@ -18,7 +18,7 @@ type DbCard = {
   due_date: string | null; is_archived: boolean; completed_at: string | null;
 };
 type Column = List & { cards: DbCard[] };
-type Member = { user_id: string; name: string };
+type Member = { user_id: string; name: string; role?: string };
 type Comment = { id: string; user_id: string | null; body: string; created_at: string };
 type Checklist = { id: string; card_id: string; name: string };
 type ChecklistItem = { id: string; checklist_id: string; name: string; is_completed: boolean };
@@ -96,6 +96,8 @@ export default function Home() {
     if (ids.length) {
       const { data: profiles } = await supabase.from("profiles").select("id,full_name").in("id", ids);
       setMembers(ids.map(id => ({ user_id: id, name: profiles?.find(p => p.id === id)?.full_name || (id === userId ? userName : "Team member") })));
+    const { data: memberRows } = await supabase.from("workspace_members").select("user_id,role").eq("workspace_id", workspace.id);
+    if (memberRows?.length) setMembers(prev => prev.map(m => ({ ...m, role: memberRows.find(x => x.user_id === m.user_id)?.role ?? "member" })));
     } else setMembers([]);
     setLoading(false);
   }
@@ -242,6 +244,16 @@ export default function Home() {
       await loadWorkspace(activeWorkspace!);
     }
     setSaving(false);
+  }
+
+  async function addWorkspaceMember() {
+    if (!activeWorkspace || !userId) return;
+    const email = window.prompt("Enter the teammate's account email");
+    if (!email?.trim()) return;
+    const { data: profile } = await supabase.from("profiles").select("id,full_name").eq("email", email.trim()).maybeSingle();
+    if (!profile) { setError("No Exito user was found for that email."); return; }
+    const { error: e } = await supabase.from("workspace_members").insert({ workspace_id: activeWorkspace.id, user_id: profile.id, role: "member" });
+    if (e) setError(e.message); else await loadWorkspace(activeWorkspace);
   }
 
   async function createWorkspace() {
@@ -481,8 +493,8 @@ export default function Home() {
             </section>
           ) : activeNav === "Team" ? (
             <section className="my-work-panel">
-              <div className="my-work-head"><div><span className="eyebrow">Workspace members</span><h2>Team</h2><p>People who can collaborate on this workspace.</p></div></div>
-              {members.length ? <div className="my-work-list">{members.map(member=><div key={member.user_id} className="my-work-item"><span className="my-work-check assignee">{initials(member.name)}</span><span className="my-work-copy"><strong>{member.name}</strong><small>{member.user_id===userId ? "You · Workspace member" : "Workspace member"}</small></span></div>)}</div> : <div className="empty-state"><Users size={25}/><strong>No team members found</strong><p>Workspace members will appear here when they are added.</p></div>}
+              <div className="my-work-head"><div><span className="eyebrow">Workspace members</span><h2>Team</h2><p>People who can collaborate on this workspace.</p></div><button className="secondary-button" onClick={()=>void addWorkspaceMember()}><Users size={15}/> Add member</button></div>
+              {members.length ? <div className="my-work-list">{members.map(member=><div key={member.user_id} className="my-work-item"><span className="my-work-check assignee">{initials(member.name)}</span><span className="my-work-copy"><strong>{member.name}</strong><small>{member.user_id===userId ? `You · ${member.role ?? "member"}` : (member.role ?? "member")}</small></span></div>)}</div> : <div className="empty-state"><Users size={25}/><strong>No team members found</strong><p>Workspace members will appear here when they are added.</p></div>}
             </section>
           ) : loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
             !board ? <div className="empty-state"><Grid2X2 size={26}/><strong>No board yet</strong><p>This workspace is ready for its first board.</p><button className="primary-button" onClick={createBoard} disabled={saving}><CirclePlus size={16}/> {saving?"Creating...":"Create board"}</button></div> :
