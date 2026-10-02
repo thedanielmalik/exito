@@ -15,7 +15,7 @@ export default function LoginPage() {
     setMessage("");
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: new URL("/auth/callback", window.location.origin).toString() },
     });
     setLoading(false);
     setMessage(error ? error.message : "Check your email for your Exito sign-in link.");
