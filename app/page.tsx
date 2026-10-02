@@ -147,7 +147,6 @@ export default function Home() {
       if (!active) return;
       if (!user) { window.location.href = "/login"; return; }
       setUserId(user.id);
-      await loadMyWork();
 
       const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
       const name = profile?.full_name || user.email?.split("@")[0] || "Daniel Malik";
@@ -166,6 +165,11 @@ export default function Home() {
     })();
     return () => { active = false; };
   }, [supabase]);
+
+  useEffect(() => {
+    if (!userId) return;
+    void loadMyWork();
+  }, [userId]);
 
   useEffect(() => {
     if (!board?.id) return;
@@ -408,8 +412,21 @@ export default function Home() {
                 <span className="my-work-check">{card.completed_at ? <Check size={13}/> : ""}</span><span className="my-work-copy"><strong>{card.title}</strong><small>{card.workspace_name} · {card.board_name} · {card.list_name}</small></span><span className="my-work-date">{metaFor(card)}</span>
               </button>)}</div> : <div className="empty-state"><BriefcaseBusiness size={25}/><strong>No assigned work</strong><p>Cards assigned to you will appear here across your workspaces.</p></div>}
             </section>
-          ) : (
-          {loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
+          ) : activeNav === "Calendar" ? (
+            <section className="my-work-panel">
+              <div className="my-work-head"><div><span className="eyebrow">Deadlines</span><h2>Calendar</h2><p>Upcoming work with due dates on the active board.</p></div></div>
+              {columns.flatMap(c=>c.cards.map(card=>({...card,list_name:c.name}))).filter(card=>card.due_date).sort((a,b)=>new Date(a.due_date!).getTime()-new Date(b.due_date!).getTime()).length ?
+                <div className="my-work-list">{columns.flatMap(c=>c.cards.map(card=>({...card,list_name:c.name}))).filter(card=>card.due_date).sort((a,b)=>new Date(a.due_date!).getTime()-new Date(b.due_date!).getTime()).map(card=><button key={card.id} className="my-work-item" onClick={()=>void openCard(card)}>
+                  <span className="my-work-check"><CalendarDays size={14}/></span><span className="my-work-copy"><strong>{card.title}</strong><small>{card.list_name} · {board?.name ?? "Board"}</small></span><span className="my-work-date">{new Date(card.due_date!).toLocaleDateString("en-NG",{day:"numeric",month:"short",year:"numeric"})}</span>
+                </button>)}</div>
+                : <div className="empty-state"><CalendarDays size={25}/><strong>No deadlines on this board</strong><p>Add due dates to cards and they will appear here.</p></div>}
+            </section>
+          ) : activeNav === "Team" ? (
+            <section className="my-work-panel">
+              <div className="my-work-head"><div><span className="eyebrow">Workspace members</span><h2>Team</h2><p>People who can collaborate on this workspace.</p></div></div>
+              {members.length ? <div className="my-work-list">{members.map(member=><div key={member.user_id} className="my-work-item"><span className="my-work-check assignee">{initials(member.name)}</span><span className="my-work-copy"><strong>{member.name}</strong><small>{member.user_id===userId ? "You · Workspace member" : "Workspace member"}</small></span></div>)}</div> : <div className="empty-state"><Users size={25}/><strong>No team members found</strong><p>Workspace members will appear here when they are added.</p></div>}
+            </section>
+          ) : loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
             !board ? <div className="empty-state"><Grid2X2 size={26}/><strong>No board yet</strong><p>This workspace is ready for its first board.</p><button className="primary-button" onClick={createBoard} disabled={saving}><CirclePlus size={16}/> {saving?"Creating...":"Create board"}</button></div> :
             <div className="board">
               {filteredColumns.map(column => (
@@ -433,7 +450,6 @@ export default function Home() {
             </div>
           }
 
-          )}
           <div className="ai-strip"><div className="ai-icon"><Sparkles size={18}/></div><div><strong>Exito AI is coming to the board.</strong><p>Ask what needs attention, create work from a conversation, or let Exito prepare your next action plan.</p></div><button className="secondary-button">Explore AI</button></div>
         </div>
       </section>
