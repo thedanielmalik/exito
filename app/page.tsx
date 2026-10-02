@@ -94,6 +94,7 @@ export default function Home() {
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [automationsLoading, setAutomationsLoading] = useState(false);
+  const [boardView, setBoardView] = useState<"board"|"calendar"|"timeline">("board");
 
   async function loadBoard(nextBoard: Board, workspace: Workspace) {
     setBoard(nextBoard);
@@ -697,9 +698,9 @@ export default function Home() {
               <button className="secondary-button" onClick={()=>void updateBoardSettings()}><Settings2 size={15}/> Board settings</button><button className="secondary-button" onClick={()=>void createBoard()}><CirclePlus size={15}/> New board</button>
             </div>}
             <div className="view-actions">
-              <button className="view-button active"><Grid2X2 size={15}/> Board</button>
-              <button className="view-button"><CalendarDays size={15}/> Calendar</button>
-              <button className="view-button"><Clock3 size={15}/> Timeline</button>
+              <button className={boardView==="board"?"view-button active":"view-button"} onClick={()=>setBoardView("board")}><Grid2X2 size={15}/> Board</button>
+              <button className={boardView==="calendar"?"view-button active":"view-button"} onClick={()=>setBoardView("calendar")}><CalendarDays size={15}/> Calendar</button>
+              <button className={boardView==="timeline"?"view-button active":"view-button"} onClick={()=>setBoardView("timeline")}><Clock3 size={15}/> Timeline</button>
               {board && <button className="view-button" onClick={addList}><CirclePlus size={15}/> List</button>}
             </div>
           </div>}
@@ -750,17 +751,14 @@ export default function Home() {
             </section>
           ) : activeNav === "Boards" ? (loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
             !board ? <div className="empty-state"><Grid2X2 size={26}/><strong>No board yet</strong><p>This workspace is ready for its first board.</p><button className="primary-button" onClick={createBoard} disabled={saving}><CirclePlus size={16}/> {saving?"Creating...":"Create board"}</button></div> :
-            <div className="board">
+            {boardView==="board" ? <div className="board">
               {filteredColumns.map(column => (
-                <div className="column" key={column.id}
-                  onDragOver={e=>e.preventDefault()}
-                  onDrop={()=>dragCardId && void moveCard(dragCardId,column)}>
+                <div className="column" key={column.id} onDragOver={e=>e.preventDefault()} onDrop={()=>dragCardId && void moveCard(dragCardId,column)}>
                   <div className="column-header"><div><span className="column-dot"></span><strong>{column.name}</strong><span className="count">{column.cards.length}</span></div>
                     <button className="column-more" onClick={()=>renameList(column)} title="Rename list"><MoreHorizontal size={17}/></button>
                   </div>
                   <div className="card-stack">
-                    {column.cards.map(card => <article className="task-card" key={card.id} draggable
-                      onDragStart={()=>setDragCardId(card.id)} onClick={()=>void openCard(card)}>
+                    {column.cards.map(card => <article className="task-card" key={card.id} draggable onDragStart={()=>setDragCardId(card.id)} onClick={()=>void openCard(card)}>
                       <div className="card-top"><div className="labels"><span className="label">{board.name}</span></div><button className="card-more" onClick={e=>{e.stopPropagation();void openCard(card)}}><MoreHorizontal size={15}/></button></div>
                       <h3>{card.title}</h3><div className="card-footer"><span className="card-meta">{metaFor(card)}</span><span className="assignee">{initials(userName)}</span></div>
                     </article>)}
@@ -769,10 +767,20 @@ export default function Home() {
                 </div>
               ))}
               <button className="add-list-column" onClick={addList}><CirclePlus size={17}/> Add another list</button>
-            </div>
+            </div> : boardView==="calendar" ? <div className="board-view-list">
+              {filteredColumns.flatMap(c=>c.cards.map(card=>({...card,list_name:c.name}))).filter(card=>card.due_date).sort((a,b)=>new Date(a.due_date!).getTime()-new Date(b.due_date!).getTime()).map(card=>
+                <button className="board-view-row" key={card.id} onClick={()=>void openCard(card)}><span className="board-view-date"><CalendarDays size={14}/>{new Date(card.due_date!).toLocaleDateString("en-NG",{day:"2-digit",month:"short"})}</span><span className="board-view-main"><strong>{card.title}</strong><small>{card.list_name}</small></span><span className="board-view-meta">{metaFor(card)}</span></button>
+              )}
+              {!filteredColumns.some(c=>c.cards.some(card=>card.due_date)) && <div className="empty-state"><CalendarDays size={25}/><strong>No dated work</strong><p>Add due dates to see the board in calendar order.</p></div>}
+            </div> : <div className="board-view-list">
+              {filteredColumns.flatMap(c=>c.cards.map(card=>({...card,list_name:c.name}))).sort((a,b)=>(a.due_date?new Date(a.due_date).getTime():Infinity)-(b.due_date?new Date(b.due_date).getTime():Infinity)).map(card=>
+                <button className="board-view-row" key={card.id} onClick={()=>void openCard(card)}><span className="board-view-date"><Clock3 size={14}/>{card.due_date?new Date(card.due_date).toLocaleDateString("en-NG",{day:"2-digit",month:"short"}):"No date"}</span><span className="board-view-main"><strong>{card.title}</strong><small>{card.list_name} · {board.name}</small></span><span className="board-view-meta">{metaFor(card)}</span></button>
+              )}
+              {!filteredColumns.some(c=>c.cards.length) && <div className="empty-state"><Clock3 size={25}/><strong>No work yet</strong><p>Add cards to build your timeline.</p></div>}
+            </div>}
           ) : null}
 
-          <div className="ai-strip"><div className="ai-icon"><Sparkles size={18}/></div><div><strong>Exito AI is coming to the board.</strong><p>Ask what needs attention, create work from a conversation, or let Exito prepare your next action plan.</p></div><button className="secondary-button">Explore AI</button></div>
+          <div className="ai-strip"><div className="ai-icon"><Sparkles size={18}/></div><div><strong>Exito AI is coming to the board.</strong><p>Ask what needs attention, create work from a conversation, or let Exito prepare your next action plan.</p></div><button className="secondary-button" disabled title="AI assistant is being prepared">Explore AI</button></div>
         </div>
       </section>
 
