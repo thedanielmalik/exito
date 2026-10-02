@@ -5,7 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bell, BriefcaseBusiness, CalendarDays, Check, ChevronDown, CirclePlus,
   Clock3, Command, Grid2X2, LayoutDashboard, Loader2, MessageCircle,
-  MoreHorizontal, Search, Settings2, Sparkles, Trash2, Users, X, Library, Zap, Copy, ToggleLeft, ToggleRight, Plus, WandSparkles, Table2, ListChecks, Bot, RefreshCw, Archive, ArchiveRestore,
+  MoreHorizontal, Search, Settings2, Sparkles, Trash2, Users, X, Library, Zap, Copy, ToggleLeft, ToggleRight, Plus, RefreshCw,
 } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
 
