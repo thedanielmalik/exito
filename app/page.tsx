@@ -552,7 +552,13 @@ export default function Home() {
     const { data, error: e } = await supabase.from("cards").update({ list_id: targetList.id, position, completed_at: completedAt })
       .eq("id", cardId).select("id,board_id,list_id,title,description,position,created_at,due_date,is_archived,completed_at").single();
     if (e) setError(e.message);
-    else if (data) { setSelectedCard(selectedCard?.id === data.id ? data : selectedCard); await logActivity(data, "card_moved", { to_list: targetList.name }); await loadWorkspace(activeWorkspace!); }
+    else if (data) {
+      setSelectedCard(selectedCard?.id === data.id ? data : selectedCard);
+      await logActivity(data, "card_moved", { to_list: targetList.name });
+      await runAutomationRules("card_moved", data, { to_list: targetList.name });
+      if (completedAt) await runAutomationRules("card_completed", data, { to_list: targetList.name });
+      await loadWorkspace(activeWorkspace!);
+    }
     setDragCardId(null);
   }
 
