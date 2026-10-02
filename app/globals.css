@@ -139,3 +139,11 @@ button { border: 0; cursor: pointer; }
 .auth-card input:focus { border-color: #9b97ff; box-shadow: 0 0 0 3px rgba(99,91,255,.10); }
 .auth-card .primary-button { justify-content: center; margin-top: 6px; height: 44px; }
 .auth-message { margin-top: 15px; padding: 10px 12px; border-radius: 8px; background: #f4f3ff; color: #514bb4; font-size: 11px; }
+
+.loading-state,.empty-state { min-height: 300px; display: grid; place-items: center; align-content: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); font-size: 12px; }
+.empty-state strong { color: var(--ink); font-size: 15px; }
+.empty-state p { margin: 0; color: var(--muted); max-width: 360px; text-align: center; line-height: 1.5; }
+.error-banner { margin: -20px 0 20px; padding: 10px 12px; border-radius: 9px; background: #fff0ef; border: 1px solid #f3d0cc; color: #9a3c32; font-size: 11px; }
+button:disabled { opacity: .55; cursor: wait; }
+.spin { animation: exito-spin 1s linear infinite; }
+@keyframes exito-spin { to { transform: rotate(360deg); } }
