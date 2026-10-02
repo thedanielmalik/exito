@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   Bell, BriefcaseBusiness, CalendarDays, ChevronDown, CirclePlus,
   Clock3, Command, Grid2X2, LayoutDashboard, Loader2, MoreHorizontal,
@@ -149,6 +150,13 @@ export default function Home() {
   const totalCards = columns.reduce((sum, column) => sum + column.cards.length, 0);
   const completed = columns.find(c => c.name.toLowerCase() === "completed")?.cards.length ?? 0;
   const todo = columns.filter(c => !["completed"].includes(c.name.toLowerCase())).reduce((sum,c) => sum+c.cards.length,0);
+  const navigationItems: Array<[LucideIcon, string]> = [
+    [LayoutDashboard, "Overview"],
+    [BriefcaseBusiness, "My Work"],
+    [Grid2X2, "Boards"],
+    [CalendarDays, "Calendar"],
+    [Users, "Team"],
+  ];
 
   return (
     <main className="app-shell">
@@ -160,13 +168,7 @@ export default function Home() {
         </div>
 
         <nav className="nav">
-          {[
-            [LayoutDashboard, "Overview"],
-            [BriefcaseBusiness, "My Work"],
-            [Grid2X2, "Boards"],
-            [CalendarDays, "Calendar"],
-            [Users, "Team"],
-          ].map(([Icon, label]) => (
+          {navigationItems.map(([Icon, label]) => (
             <button className={activeNav === label ? "nav-item active" : "nav-item"} key={label} onClick={() => setActiveNav(label)}>
               <Icon size={18}/><span>{label}</span>
             </button>
