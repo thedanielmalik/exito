@@ -751,7 +751,7 @@ export default function Home() {
             </section>
           ) : activeNav === "Boards" ? (loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
             !board ? <div className="empty-state"><Grid2X2 size={26}/><strong>No board yet</strong><p>This workspace is ready for its first board.</p><button className="primary-button" onClick={createBoard} disabled={saving}><CirclePlus size={16}/> {saving?"Creating...":"Create board"}</button></div> :
-            {boardView==="board" ? <div className="board">
+            boardView==="board" ? <div className="board">
               {filteredColumns.map(column => (
                 <div className="column" key={column.id} onDragOver={e=>e.preventDefault()} onDrop={()=>dragCardId && void moveCard(dragCardId,column)}>
                   <div className="column-header"><div><span className="column-dot"></span><strong>{column.name}</strong><span className="count">{column.cards.length}</span></div>
@@ -777,7 +777,7 @@ export default function Home() {
                 <button className="board-view-row" key={card.id} onClick={()=>void openCard(card)}><span className="board-view-date"><Clock3 size={14}/>{card.due_date?new Date(card.due_date).toLocaleDateString("en-NG",{day:"2-digit",month:"short"}):"No date"}</span><span className="board-view-main"><strong>{card.title}</strong><small>{card.list_name} · {board.name}</small></span><span className="board-view-meta">{metaFor(card)}</span></button>
               )}
               {!filteredColumns.some(c=>c.cards.length) && <div className="empty-state"><Clock3 size={25}/><strong>No work yet</strong><p>Add cards to build your timeline.</p></div>}
-            </div>}
+            </div>
           ) : null}
 
           <div className="ai-strip"><div className="ai-icon"><Sparkles size={18}/></div><div><strong>Exito AI is coming to the board.</strong><p>Ask what needs attention, create work from a conversation, or let Exito prepare your next action plan.</p></div><button className="secondary-button" disabled title="AI assistant is being prepared">Explore AI</button></div>
