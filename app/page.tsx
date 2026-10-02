@@ -7,7 +7,7 @@ import {
   Clock3, Command, Grid2X2, LayoutDashboard, Loader2, MoreHorizontal,
   Search, Settings2, Sparkles, Users,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "../lib/supabase/client";
 
 type Workspace = { id: string; name: string; icon: string | null };
 type Board = { id: string; workspace_id: string; name: string };
