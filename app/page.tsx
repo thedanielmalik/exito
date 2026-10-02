@@ -53,6 +53,7 @@ export default function Home() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
+  const [boards, setBoards] = useState<Board[]>([]);
   const [board, setBoard] = useState<Board | null>(null);
   const [columns, setColumns] = useState<Column[]>([]);
   const [query, setQuery] = useState("");
@@ -71,20 +72,10 @@ export default function Home() {
   const [newChecklistName, setNewChecklistName] = useState("");
   const [dragCardId, setDragCardId] = useState<string | null>(null);
 
-  async function loadWorkspace(workspace: Workspace) {
+  async function loadBoard(nextBoard: Board, workspace: Workspace) {
+    setBoard(nextBoard);
     setLoading(true);
     setError("");
-    setActiveWorkspace(workspace);
-
-    const { data: boards, error: boardError } = await supabase
-      .from("boards").select("id,workspace_id,name").eq("workspace_id", workspace.id)
-      .is("archived_at", null).order("created_at", { ascending: true }).limit(1);
-    if (boardError) { setError(boardError.message); setLoading(false); return; }
-
-    const nextBoard = boards?.[0] ?? null;
-    setBoard(nextBoard);
-    if (!nextBoard) { setColumns([]); setLoading(false); return; }
-
     const { data: lists, error: listError } = await supabase
       .from("lists").select("id,board_id,name,position").eq("board_id", nextBoard.id)
       .is("archived_at", null).order("position", { ascending: true });
@@ -103,10 +94,27 @@ export default function Home() {
       const { data: profiles } = await supabase.from("profiles").select("id,full_name").in("id", ids);
       setMembers(ids.map(id => ({ user_id: id, name: profiles?.find(p => p.id === id)?.full_name || (id === userId ? userName : "Team member") })));
     } else setMembers([]);
-
     setLoading(false);
   }
 
+  async function loadWorkspace(workspace: Workspace) {
+    setLoading(true);
+    setError("");
+    setActiveWorkspace(workspace);
+    setSelectedCard(null);
+
+    const { data: boardRows, error: boardError } = await supabase
+      .from("boards").select("id,workspace_id,name").eq("workspace_id", workspace.id)
+      .is("archived_at", null).order("created_at", { ascending: true });
+    if (boardError) { setError(boardError.message); setLoading(false); return; }
+
+    const nextBoards = boardRows ?? [];
+    setBoards(nextBoards);
+    if (!nextBoards.length) { setBoard(null); setColumns([]); setLoading(false); return; }
+
+    const current = board && nextBoards.some(b => b.id === board.id) ? board : nextBoards[0];
+    await loadBoard(current, workspace);
+  }
   useEffect(() => {
     let active = true;
     (async () => {
@@ -191,14 +199,14 @@ export default function Home() {
 
   async function createBoard() {
     if (!activeWorkspace || !userId) return;
-    const name = window.prompt("Name your first board");
+    const name = window.prompt("Name your board");
     if (!name?.trim()) return;
     setSaving(true); setError("");
     const { data, error: boardError } = await supabase.from("boards").insert({
       workspace_id: activeWorkspace.id, name: name.trim(), created_by: userId,
     }).select("id,workspace_id,name").single();
     if (boardError) setError(boardError.message);
-    else { setBoard(data); await loadWorkspace(activeWorkspace); }
+    else if (data) { setBoards(prev => [...prev, data]); await loadBoard(data, activeWorkspace); }
     setSaving(false);
   }
 
@@ -350,6 +358,15 @@ export default function Home() {
 
           <div className="section-title">
             <div><span className="eyebrow">Active board</span><h2>{board?.name ?? "No board yet"}</h2></div>
+            {board && <div className="board-switcher">
+              <select value={board.id} onChange={e => {
+                const next = boards.find(b => b.id === e.target.value);
+                if (next && activeWorkspace) void loadBoard(next, activeWorkspace);
+              }}>
+                {boards.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <button className="secondary-button" onClick={()=>void createBoard()}><CirclePlus size={15}/> New board</button>
+            </div>}
             <div className="view-actions">
               <button className="view-button active"><Grid2X2 size={15}/> Board</button>
               <button className="view-button"><CalendarDays size={15}/> Calendar</button>
