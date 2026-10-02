@@ -266,7 +266,7 @@ export default function Home() {
   }
 
   async function loadCardDetails(card: DbCard) {
-    const [commentRes, checklistRes, memberRes, activityRes, labelRes, fieldRes] = await Promise.all([
+    const [labelRes, commentRes, checklistRes, memberRes, activityRes, fieldRes] = await Promise.all([
       supabase.from("card_labels").select("label_id").eq("card_id", card.id),
       supabase.from("comments").select("id,user_id,body,created_at").eq("card_id", card.id).order("created_at", { ascending: true }),
       supabase.from("checklists").select("id,card_id,name").eq("card_id", card.id).order("created_at", { ascending: true }),
