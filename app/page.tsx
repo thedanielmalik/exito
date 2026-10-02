@@ -485,7 +485,7 @@ export default function Home() {
           <div className="metrics">
             <div className="metric"><span>Active work</span><strong>{dashboardCards.filter(c=>!c.completed_at).length}</strong><small>across all businesses</small></div>
             <div className="metric"><span>Overdue</span><strong>{dashboardCards.filter(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()<Date.now()).length}</strong><small>needs attention</small></div>
-            <div className="metric"><span>Due next 7 days</span><strong>{dashboardCards.filter(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()<=Date.now()+7*86400000).length}</strong><small>upcoming</small></div>
+            <div className="metric"><span>Due next 7 days</span><strong>{dashboardCards.filter(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()>=Date.now()&&new Date(c.due_date).getTime()<=Date.now()+7*86400000).length}</strong><small>upcoming</small></div>
             <div className="metric"><span>Completed</span><strong>{dashboardCards.filter(c=>c.completed_at&&new Date(c.completed_at).getTime()>=Date.now()-7*86400000).length}</strong><small>in the last 7 days</small></div>
           </div>
 
@@ -541,7 +541,7 @@ export default function Home() {
           ) : activeNav === "My Work" ? (
             <section className="my-work-panel">
               <div className="my-work-head"><div><span className="eyebrow">Assigned to you</span><h2>My Work</h2><p>Everything currently assigned to you across Exito.</p></div><button className="secondary-button" onClick={()=>void loadMyWork()}><Clock3 size={15}/> Refresh</button></div>
-              {myWork.length ? <div className="my-work-list">{myWork.map(card => <button key={card.id} className="my-work-item" onClick={()=>{setActiveNav("Overview"); const b=boards.find(x=>x.id===card.board_id); if(b&&activeWorkspace) void loadBoard(b,activeWorkspace); void openCard(card);}}>
+              {myWork.length ? <div className="my-work-list">{myWork.map(card => <button key={card.id} className="my-work-item" onClick={()=>{setActiveNav("Boards"); const b=boards.find(x=>x.id===card.board_id); if(b&&activeWorkspace) void loadBoard(b,activeWorkspace); void openCard(card);}}>
                 <span className="my-work-check">{card.completed_at ? <Check size={13}/> : ""}</span><span className="my-work-copy"><strong>{card.title}</strong><small>{card.workspace_name} · {card.board_name} · {card.list_name}</small></span><span className="my-work-date">{metaFor(card)}</span>
               </button>)}</div> : <div className="empty-state"><BriefcaseBusiness size={25}/><strong>No assigned work</strong><p>Cards assigned to you will appear here across your workspaces.</p></div>}
             </section>
