@@ -160,9 +160,15 @@ export default function Home() {
         </div>
 
         <nav className="nav">
-          {[[LayoutDashboard,"Overview"],[BriefcaseBusiness,"My Work"],[Grid2X2,"Boards"],[CalendarDays,"Calendar"],[Users,"Team"]].map(([Icon,label]) => (
-            <button className={activeNav===label ? "nav-item active":"nav-item"} key={String(label)} onClick={()=>setActiveNav(String(label))}>
-              <Icon size={18}/><span>{String(label)}</span>
+          {[
+            [LayoutDashboard, "Overview"],
+            [BriefcaseBusiness, "My Work"],
+            [Grid2X2, "Boards"],
+            [CalendarDays, "Calendar"],
+            [Users, "Team"],
+          ].map(([Icon, label]) => (
+            <button className={activeNav === label ? "nav-item active" : "nav-item"} key={label} onClick={() => setActiveNav(label)}>
+              <Icon size={18}/><span>{label}</span>
             </button>
           ))}
         </nav>
