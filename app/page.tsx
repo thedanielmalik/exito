@@ -38,6 +38,7 @@ function metaFor(card: DbCard) {
 export default function Home() {
   const supabase = useMemo(() => createClient(), []);
   const [userName, setUserName] = useState("Daniel Malik");
+  const [userId, setUserId] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
@@ -82,6 +83,7 @@ export default function Home() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!active) return;
       if (!user) { window.location.href = "/login"; return; }
+      setUserId(user.id);
 
       const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
       if (profile?.full_name) setUserName(profile.full_name);
@@ -100,6 +102,24 @@ export default function Home() {
     })();
     return () => { active = false; };
   }, [supabase]);
+
+  async function createBoard() {
+    if (!activeWorkspace || !userId) return;
+    const name = window.prompt("Name your first board");
+    if (!name?.trim()) return;
+    setSaving(true); setError("");
+    const { data, error: boardError } = await supabase.from("boards").insert({
+      workspace_id: activeWorkspace.id,
+      name: name.trim(),
+      created_by: userId,
+    }).select("id,workspace_id,name").single();
+    if (boardError) setError(boardError.message);
+    else {
+      setBoard(data);
+      await loadWorkspace(activeWorkspace);
+    }
+    setSaving(false);
+  }
 
   async function addCard(columnId: string) {
     if (!board) return;
@@ -192,7 +212,7 @@ export default function Home() {
           </div>
 
           {loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
-            !board ? <div className="empty-state"><Grid2X2 size={26}/><strong>No board yet</strong><p>This workspace is ready for its first board. We’ll add board creation next.</p></div> :
+            !board ? <div className="empty-state"><Grid2X2 size={26}/><strong>No board yet</strong><p>This workspace is ready for its first board.</p><button className="primary-button" onClick={createBoard} disabled={saving}><CirclePlus size={16}/> {saving?"Creating...":"Create board"}</button></div> :
             <div className="board">{filteredColumns.map(column => (
               <div className="column" key={column.id}>
                 <div className="column-header"><div><span className="column-dot"></span><strong>{column.name}</strong><span className="count">{column.cards.length}</span></div><button className="column-more"><MoreHorizontal size={17}/></button></div>
