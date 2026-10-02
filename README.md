@@ -29,3 +29,18 @@ The long-term platform will add team collaboration, CRM and sales pipelines, pro
 GitHub is the source of truth. Lovable is used for rapid UI/application iteration and Vercel is the production target.
 
 See docs/product-blueprint.md and docs/development-rules.md.
+
+
+## Deployment
+
+### Supabase
+Set:
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+
+Do not commit secrets. The service-role key is server-only and is not required by the current browser dashboard.
+
+### Vercel
+Connect the repository `thedanielmalik/exito` to a Vercel project and set the two public Supabase variables above for Production, Preview, and Development as appropriate. Then deploy the default branch.
+
+The current Exito repository is intentionally deployment-ready but does not contain Vercel project IDs or credentials.
