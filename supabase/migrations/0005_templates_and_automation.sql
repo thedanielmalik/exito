@@ -57,6 +57,17 @@ alter table public.board_template_lists enable row level security;
 alter table public.board_template_labels enable row level security;
 alter table public.board_template_fields enable row level security;
 alter table public.automation_rules enable row level security;
+drop policy if exists "board_templates_member_select" on public.board_templates;
+drop policy if exists "board_templates_member_insert" on public.board_templates;
+drop policy if exists "board_templates_member_update" on public.board_templates;
+drop policy if exists "board_templates_member_delete" on public.board_templates;
+drop policy if exists "template_lists_member_all" on public.board_template_lists;
+drop policy if exists "template_labels_member_all" on public.board_template_labels;
+drop policy if exists "template_fields_member_all" on public.board_template_fields;
+drop policy if exists "automation_rules_member_select" on public.automation_rules;
+drop policy if exists "automation_rules_member_insert" on public.automation_rules;
+drop policy if exists "automation_rules_member_update" on public.automation_rules;
+drop policy if exists "automation_rules_member_delete" on public.automation_rules;
 
 create policy "board_templates_member_select" on public.board_templates for select using (public.is_org_member(organization_id));
 create policy "board_templates_member_insert" on public.board_templates for insert with check (public.is_org_member(organization_id));
