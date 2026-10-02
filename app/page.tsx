@@ -24,6 +24,9 @@ type Checklist = { id: string; card_id: string; name: string };
 type ChecklistItem = { id: string; checklist_id: string; name: string; is_completed: boolean };
 type Activity = { id: string; user_id: string | null; action_type: string; metadata: Record<string, unknown>; created_at: string };
 type Notification = { id: string; title: string; body: string | null; type: string; entity_type: string | null; entity_id: string | null; read_at: string | null; created_at: string };
+type DashboardCard = DbCard & { board_name: string; workspace_name: string; list_name: string };
+type DashboardMember = { user_id: string; name: string; active: number; overdue: number; completed: number };
+type DashboardActivity = Activity & { user_name: string };
 
 const workspaceStyle: Record<string, { initials: string; tone: string }> = {
   "WAWO Hub": { initials: "WH", tone: "sand" },
@@ -74,6 +77,10 @@ export default function Home() {
   const [dragCardId, setDragCardId] = useState<string | null>(null);
   const [myWork, setMyWork] = useState<Array<DbCard & { board_name: string; workspace_name: string; list_name: string }>>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [dashboardCards, setDashboardCards] = useState<DashboardCard[]>([]);
+  const [dashboardMembers, setDashboardMembers] = useState<DashboardMember[]>([]);
+  const [dashboardActivities, setDashboardActivities] = useState<DashboardActivity[]>([]);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
 
   async function loadBoard(nextBoard: Board, workspace: Workspace) {
     setBoard(nextBoard);
@@ -119,6 +126,36 @@ export default function Home() {
 
     const current = board && nextBoards.some(b => b.id === board.id) ? board : nextBoards[0];
     await loadBoard(current, workspace);
+  }
+  async function loadExecutiveDashboard() {
+    if (!orgId || !userId) return;
+    setDashboardLoading(true);
+    const { data: wsRows } = await supabase.from("workspaces").select("id,name").eq("organization_id", orgId).order("created_at", { ascending: true });
+    const workspaceRows = wsRows ?? [];
+    const workspaceIds = workspaceRows.map(w => w.id);
+    if (!workspaceIds.length) { setDashboardCards([]); setDashboardMembers([]); setDashboardActivities([]); setDashboardLoading(false); return; }
+    const { data: boardRows } = await supabase.from("boards").select("id,name,workspace_id").in("workspace_id", workspaceIds).is("archived_at", null);
+    const boardsAll = boardRows ?? []; const boardIds = boardsAll.map(b => b.id);
+    if (!boardIds.length) { setDashboardCards([]); setDashboardMembers([]); setDashboardActivities([]); setDashboardLoading(false); return; }
+    const { data: cardRows } = await supabase.from("cards").select("id,board_id,list_id,title,description,position,created_at,due_date,is_archived,completed_at").in("board_id", boardIds).eq("is_archived", false).order("due_date", { ascending: true, nullsFirst: false });
+    const { data: lists } = await supabase.from("lists").select("id,name").in("board_id", boardIds).is("archived_at", null);
+    const ids = (cardRows ?? []).map(x => x.id);
+    const [{ data: cardMembers }, { data: recentActivities }] = await Promise.all([
+      ids.length ? supabase.from("card_members").select("card_id,user_id").in("card_id", ids) : Promise.resolve({ data: [] as Array<{card_id:string;user_id:string}> }),
+      supabase.from("activities").select("id,user_id,action_type,metadata,created_at").eq("organization_id", orgId).order("created_at", { ascending: false }).limit(18),
+    ]);
+    const boardMap = new Map(boardsAll.map(b => [b.id, b])); const workspaceMap = new Map(workspaceRows.map(w => [w.id, w])); const listMap = new Map((lists ?? []).map(l => [l.id, l]));
+    const mapped: DashboardCard[] = (cardRows ?? []).map(card => { const b = boardMap.get(card.board_id); const w = b ? workspaceMap.get(b.workspace_id) : undefined; return { ...card, board_name: b?.name ?? "Board", workspace_name: w?.name ?? "Workspace", list_name: listMap.get(card.list_id)?.name ?? "List" }; });
+    setDashboardCards(mapped);
+    const memberIds = [...new Set((cardMembers ?? []).map(m => m.user_id))]; const activityUserIds = [...new Set((recentActivities ?? []).map(a => a.user_id).filter(Boolean) as string[])];
+    const profileIds = [...new Set([...memberIds, ...activityUserIds, userId])];
+    const { data: profiles } = profileIds.length ? await supabase.from("profiles").select("id,full_name").in("id", profileIds) : { data: [] as Array<{id:string;full_name:string|null}> };
+    const profileMap = new Map((profiles ?? []).map(p => [p.id, p.full_name || "Team member"]));
+    const memberCardMap = new Map<string, string[]>();
+    (cardMembers ?? []).forEach(m => { const arr = memberCardMap.get(m.user_id) ?? []; arr.push(m.card_id); memberCardMap.set(m.user_id, arr); });
+    setDashboardMembers(memberIds.map(id => { const assigned = (cardRows ?? []).filter(c => memberCardMap.get(id)?.includes(c.id)); return { user_id: id, name: profileMap.get(id) ?? "Team member", active: assigned.filter(c => !c.completed_at).length, overdue: assigned.filter(c => !c.completed_at && c.due_date && new Date(c.due_date).getTime() < Date.now()).length, completed: assigned.filter(c => !!c.completed_at).length }; }).sort((a,b) => b.active - a.active));
+    setDashboardActivities((recentActivities ?? []).map(a => ({ ...a, user_name: a.user_id ? (profileMap.get(a.user_id) ?? "Team member") : "System" })));
+    setDashboardLoading(false);
   }
   async function loadNotifications() {
     if (!userId) return;
@@ -189,6 +226,11 @@ export default function Home() {
     void loadMyWork();
     void loadNotifications();
   }, [userId]);
+
+  useEffect(() => {
+    if (!orgId || !userId || activeNav !== "Overview") return;
+    void loadExecutiveDashboard();
+  }, [orgId, userId, activeNav]);
 
   useEffect(() => {
     if (!board?.id) return;
@@ -441,15 +483,36 @@ export default function Home() {
           </div>
 
           <div className="metrics">
-            <div className="metric"><span>Active work</span><strong>{todo}</strong><small>{activeWorkspace?.name ?? "workspace"}</small></div>
-            <div className="metric"><span>Board cards</span><strong>{totalCards}</strong><small>{board?.name ?? "No active board"}</small></div>
-            <div className="metric"><span>Completed</span><strong>{completed}</strong><small>on this board</small></div>
-            <div className="metric"><span>Workspaces</span><strong>{workspaces.length}</strong><small>inside Exito</small></div>
+            <div className="metric"><span>Active work</span><strong>{dashboardCards.filter(c=>!c.completed_at).length}</strong><small>across all businesses</small></div>
+            <div className="metric"><span>Overdue</span><strong>{dashboardCards.filter(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()<Date.now()).length}</strong><small>needs attention</small></div>
+            <div className="metric"><span>Due next 7 days</span><strong>{dashboardCards.filter(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()<=Date.now()+7*86400000).length}</strong><small>upcoming</small></div>
+            <div className="metric"><span>Completed</span><strong>{dashboardCards.filter(c=>c.completed_at&&new Date(c.completed_at).getTime()>=Date.now()-7*86400000).length}</strong><small>in the last 7 days</small></div>
           </div>
 
           {error && <div className="error-banner">{error}</div>}
 
-          <div className="section-title">
+          {activeNav === "Overview" ? (
+            dashboardLoading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Preparing your executive view...</span></div> :
+            <section className="executive-dashboard">
+              <div className="dashboard-grid">
+                <div className="dashboard-card"><div className="dashboard-card-head"><div><span className="eyebrow">Priority</span><h2>What needs attention</h2></div><button className="text-button" onClick={()=>setActiveNav("My Work")}>View my work</button></div><div className="priority-list">
+                  {dashboardCards.filter(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()<Date.now()).slice(0,4).map(card=><button className="priority-row" key={card.id} onClick={()=>{setActiveNav("Boards");const b=boards.find(x=>x.id===card.board_id);if(b&&activeWorkspace)void loadBoard(b,activeWorkspace);void openCard(card);}}><span className="priority-icon overdue">!</span><span><strong>{card.title}</strong><small>{card.workspace_name} · {card.list_name}</small></span><em>Overdue</em></button>)}
+                  {!dashboardCards.some(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()<Date.now())&&<div className="dashboard-empty"><Check size={17}/> No overdue work right now.</div>}
+                </div></div>
+                <div className="dashboard-card"><div className="dashboard-card-head"><div><span className="eyebrow">Next 7 days</span><h2>Upcoming</h2></div><button className="text-button" onClick={()=>setActiveNav("Calendar")}>Open calendar</button></div><div className="priority-list">
+                  {dashboardCards.filter(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()>=Date.now()&&new Date(c.due_date).getTime()<=Date.now()+7*86400000).slice(0,5).map(card=><button className="priority-row" key={card.id} onClick={()=>{setActiveNav("Boards");const b=boards.find(x=>x.id===card.board_id);if(b&&activeWorkspace)void loadBoard(b,activeWorkspace);void openCard(card);}}><span className="priority-icon"><CalendarDays size={14}/></span><span><strong>{card.title}</strong><small>{card.workspace_name} · {card.list_name}</small></span><em>{new Date(card.due_date!).toLocaleDateString("en-NG",{day:"numeric",month:"short"})}</em></button>)}
+                  {!dashboardCards.some(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()>=Date.now()&&new Date(c.due_date).getTime()<=Date.now()+7*86400000)&&<div className="dashboard-empty"><CalendarDays size={17}/> Nothing due in the next 7 days.</div>}
+                </div></div>
+              </div>
+              <div className="dashboard-grid dashboard-grid-bottom">
+                <div className="dashboard-card"><div className="dashboard-card-head"><div><span className="eyebrow">Across Exito</span><h2>Business performance</h2></div></div><div className="business-performance">{workspaces.map(w=>{const rows=dashboardCards.filter(c=>c.workspace_name===w.name);const active=rows.filter(c=>!c.completed_at).length;const done=rows.filter(c=>!!c.completed_at).length;const overdue=rows.filter(c=>!c.completed_at&&c.due_date&&new Date(c.due_date).getTime()<Date.now()).length;return <button key={w.id} className="business-performance-row" onClick={()=>void loadWorkspace(w)}><span className={"mini-avatar "+(workspaceStyle[w.name]?.tone??"navy")}>{workspaceStyle[w.name]?.initials??initials(w.name)}</span><span className="business-performance-copy"><strong>{w.name}</strong><small>{active} active · {done} completed · {overdue} overdue</small></span><span className="performance-bar"><i /></span></button>})}</div></div>
+                <div className="dashboard-card"><div className="dashboard-card-head"><div><span className="eyebrow">Team</span><h2>Workload</h2></div><button className="text-button" onClick={()=>setActiveNav("Team")}>Manage team</button></div><div className="workload-list">{dashboardMembers.slice(0,6).map(m=><div className="workload-row" key={m.user_id}><span className="assignee">{initials(m.name)}</span><span className="workload-copy"><strong>{m.name}</strong><small>{m.active} active · {m.completed} completed</small></span>{m.overdue>0&&<em>{m.overdue} overdue</em>}</div>)}{!dashboardMembers.length&&<div className="dashboard-empty"><Users size={17}/> No assigned team workload yet.</div>}</div></div>
+              </div>
+              <div className="dashboard-card activity-dashboard"><div className="dashboard-card-head"><div><span className="eyebrow">Live pulse</span><h2>Recent activity</h2></div><button className="text-button" onClick={()=>void loadExecutiveDashboard()}>Refresh</button></div><div className="activity-feed">{dashboardActivities.slice(0,10).map(a=><div className="dashboard-activity" key={a.id}><span className="activity-dot"/><div><strong>{a.user_name}</strong> {prettyAction(a.action_type).toLowerCase()}<small>{new Date(a.created_at).toLocaleString("en-NG")}</small></div></div>)}{!dashboardActivities.length&&<div className="dashboard-empty"><Clock3 size={17}/> Activity will appear here as work moves.</div>}</div></div>
+              <div className="dashboard-quick-actions"><button className="secondary-button" onClick={()=>setActiveNav("My Work")}><BriefcaseBusiness size={15}/> My work</button><button className="secondary-button" onClick={()=>setActiveNav("Boards")}><Grid2X2 size={15}/> Open boards</button><button className="secondary-button" onClick={()=>setActiveNav("Calendar")}><CalendarDays size={15}/> Calendar</button><button className="secondary-button" onClick={()=>setActiveNav("Team")}><Users size={15}/> Team</button></div>
+            </section>
+          ) : null}
+          {activeNav === "Boards" && <div className="section-title">
             <div><span className="eyebrow">Active board</span><h2>{board?.name ?? "No board yet"}</h2></div>
             {board && <div className="board-switcher">
               <select value={board.id} onChange={e => {
@@ -466,7 +529,7 @@ export default function Home() {
               <button className="view-button"><Clock3 size={15}/> Timeline</button>
               {board && <button className="view-button" onClick={addList}><CirclePlus size={15}/> List</button>}
             </div>
-          </div>
+          </div>}
 
           {activeNav === "Notifications" ? (
             <section className="my-work-panel">
@@ -496,7 +559,7 @@ export default function Home() {
               <div className="my-work-head"><div><span className="eyebrow">Workspace members</span><h2>Team</h2><p>People who can collaborate on this workspace.</p></div><button className="secondary-button" onClick={()=>void addWorkspaceMember()}><Users size={15}/> Add member</button></div>
               {members.length ? <div className="my-work-list">{members.map(member=><div key={member.user_id} className="my-work-item"><span className="my-work-check assignee">{initials(member.name)}</span><span className="my-work-copy"><strong>{member.name}</strong><small>{member.user_id===userId ? `You · ${member.role ?? "member"}` : (member.role ?? "member")}</small></span></div>)}</div> : <div className="empty-state"><Users size={25}/><strong>No team members found</strong><p>Workspace members will appear here when they are added.</p></div>}
             </section>
-          ) : loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
+          ) : activeNav === "Boards" ? (loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
             !board ? <div className="empty-state"><Grid2X2 size={26}/><strong>No board yet</strong><p>This workspace is ready for its first board.</p><button className="primary-button" onClick={createBoard} disabled={saving}><CirclePlus size={16}/> {saving?"Creating...":"Create board"}</button></div> :
             <div className="board">
               {filteredColumns.map(column => (
@@ -518,7 +581,7 @@ export default function Home() {
               ))}
               <button className="add-list-column" onClick={addList}><CirclePlus size={17}/> Add another list</button>
             </div>
-          }
+          ) : null}
 
           <div className="ai-strip"><div className="ai-icon"><Sparkles size={18}/></div><div><strong>Exito AI is coming to the board.</strong><p>Ask what needs attention, create work from a conversation, or let Exito prepare your next action plan.</p></div><button className="secondary-button">Explore AI</button></div>
         </div>
