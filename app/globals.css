@@ -137,9 +137,14 @@ button { border: 0; cursor: pointer; }
 .auth-card label { font-size: 11px; font-weight: 750; color: #4b5565; }
 .auth-card input { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 9px; padding: 0 12px; outline: none; }
 .auth-card input:focus { border-color: #9b97ff; box-shadow: 0 0 0 3px rgba(99,91,255,.10); }
+.auth-card input:disabled { background: #f7f8fa; color: #8b93a1; }
 .auth-card .primary-button { justify-content: center; margin-top: 6px; height: 44px; }
-.auth-message { margin-top: 15px; padding: 10px 12px; border-radius: 8px; background: #f4f3ff; color: #514bb4; font-size: 11px; }
-
+.auth-message { margin-top: 15px; padding: 10px 12px; border-radius: 8px; background: #fff0ef; color: #9a3c32; font-size: 11px; }
+.auth-success { display: grid; gap: 5px; margin-top: 15px; padding: 13px 14px; border-radius: 9px; background: #f4f3ff; border: 1px solid #e4e2ff; color: #514bb4; font-size: 11px; line-height: 1.45; }
+.auth-success strong { font-size: 12px; color: #4039a2; }
+.auth-success b { font-weight: 750; color: #36308f; overflow-wrap: anywhere; }
+.auth-help { display: grid; gap: 3px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #f0f1f4; color: #9aa1ae; font-size: 9px; line-height: 1.45; }
+.auth-help span:first-child { color: #697285; font-weight: 700; }
 .loading-state,.empty-state { min-height: 300px; display: grid; place-items: center; align-content: center; gap: 8px; background: #fff; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); font-size: 12px; }
 .empty-state strong { color: var(--ink); font-size: 15px; }
 .empty-state p { margin: 0; color: var(--muted); max-width: 360px; text-align: center; line-height: 1.5; }
@@ -190,11 +195,6 @@ button:disabled { opacity: .55; cursor: wait; }
 .activity-row strong { color: #343c4b; }
 .activity-dot { width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: #9c97ff; flex: 0 0 auto; }
 @keyframes drawer-in { from { transform: translateX(20px); opacity: .7; } to { transform: translateX(0); opacity: 1; } }
-@media (max-width: 700px) {
-  .card-drawer { width: 100%; }
-  .drawer-grid { grid-template-columns: 1fr; }
-  .add-list-column { min-width: 260px; }
-}
 
 .board-switcher { display: flex; align-items: center; gap: 7px; }
 .board-switcher select { height: 35px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 0 30px 0 10px; color: #4b5464; font-size: 11px; font-weight: 700; outline: 0; }
