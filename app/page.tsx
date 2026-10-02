@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell, BriefcaseBusiness, CalendarDays, Check, ChevronDown, CirclePlus,
+  Bell, BriefcaseBusiness, CalendarDays, Check, ChevronDown, CirclePlus, Mail,
   Clock3, Command, Grid2X2, LayoutDashboard, Loader2, MessageCircle,
   MoreHorizontal, Plus, Search, Settings2, Sparkles, Trash2, Users, X, Zap,
 } from "lucide-react";
 import { createClient } from "../lib/supabase/client";
+import EmailTemplatesPanel from "../components/email-templates-panel";
 
 type Workspace = { id: string; name: string; icon: string | null };
 type Board = { id: string; workspace_id: string; name: string; description?: string | null; background?: string | null; visibility?: string | null };
@@ -613,7 +614,7 @@ export default function Home() {
   const todo = columns.filter(c => c.name.toLowerCase() !== "completed").reduce((sum,c) => sum+c.cards.length,0);
   const navigationItems: Array<[LucideIcon, string]> = [
     [LayoutDashboard, "Overview"], [BriefcaseBusiness, "My Work"], [Grid2X2, "Boards"], [Bell, "Notifications"],
-    [CalendarDays, "Calendar"], [Users, "Team"], [Grid2X2, "Templates"], [Sparkles, "Automations"],
+    [CalendarDays, "Calendar"], [Users, "Team"], [Mail, "Email Templates"], [Grid2X2, "Templates"], [Sparkles, "Automations"],
   ];
 
   return (
@@ -705,7 +706,9 @@ export default function Home() {
             </div>
           </div>}
 
-          {activeNav === "Templates" ? (
+          {activeNav === "Email Templates" ? (
+            <EmailTemplatesPanel orgId={orgId} userId={userId} />
+          ) : activeNav === "Templates" ? (
             <section className="my-work-panel">
               <div className="my-work-head"><div><span className="eyebrow">Reusable workflows</span><h2>Board Templates</h2><p>Start a new board with lists, labels and custom fields already configured.</p></div><button className="secondary-button" onClick={()=>void loadTemplates()}><Clock3 size={15}/> Refresh</button></div>
               {templatesLoading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading templates...</span></div> :
