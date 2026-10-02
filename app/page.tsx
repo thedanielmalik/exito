@@ -71,6 +71,7 @@ export default function Home() {
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [newChecklistName, setNewChecklistName] = useState("");
   const [dragCardId, setDragCardId] = useState<string | null>(null);
+  const [myWork, setMyWork] = useState<Array<DbCard & { board_name: string; workspace_name: string; list_name: string }>>([]);
 
   async function loadBoard(nextBoard: Board, workspace: Workspace) {
     setBoard(nextBoard);
@@ -115,6 +116,30 @@ export default function Home() {
     const current = board && nextBoards.some(b => b.id === board.id) ? board : nextBoards[0];
     await loadBoard(current, workspace);
   }
+  async function loadMyWork() {
+    if (!userId) return;
+    const { data: memberships } = await supabase.from("card_members").select("card_id").eq("user_id", userId);
+    const ids = (memberships ?? []).map(x => x.card_id);
+    if (!ids.length) { setMyWork([]); return; }
+    const { data: cards } = await supabase.from("cards")
+      .select("id,board_id,list_id,title,description,position,created_at,due_date,is_archived,completed_at")
+      .in("id", ids).eq("is_archived", false).order("due_date", { ascending: true, nullsFirst: false }).limit(100);
+    const boardIds = [...new Set((cards ?? []).map(c => c.board_id))];
+    const listIds = [...new Set((cards ?? []).map(c => c.list_id))];
+    const [{ data: boardRows }, { data: listRows }] = await Promise.all([
+      boardIds.length ? supabase.from("boards").select("id,name,workspace_id").in("id", boardIds) : Promise.resolve({ data: [] as any[] }),
+      listIds.length ? supabase.from("lists").select("id,name").in("id", listIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const workspaceIds = [...new Set((boardRows ?? []).map(b => b.workspace_id))];
+    const { data: workspaceRows } = workspaceIds.length ? await supabase.from("workspaces").select("id,name").in("id", workspaceIds) : { data: [] as any[] };
+    setMyWork((cards ?? []).map(card => {
+      const b = boardRows?.find(x => x.id === card.board_id);
+      const l = listRows?.find(x => x.id === card.list_id);
+      const w = workspaceRows?.find(x => x.id === b?.workspace_id);
+      return { ...card, board_name: b?.name ?? "Board", workspace_name: w?.name ?? "Workspace", list_name: l?.name ?? "List" };
+    }));
+  }
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -122,6 +147,7 @@ export default function Home() {
       if (!active) return;
       if (!user) { window.location.href = "/login"; return; }
       setUserId(user.id);
+      await loadMyWork();
 
       const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
       const name = profile?.full_name || user.email?.split("@")[0] || "Daniel Malik";
@@ -375,6 +401,14 @@ export default function Home() {
             </div>
           </div>
 
+          {activeNav === "My Work" ? (
+            <section className="my-work-panel">
+              <div className="my-work-head"><div><span className="eyebrow">Assigned to you</span><h2>My Work</h2><p>Everything currently assigned to you across Exito.</p></div><button className="secondary-button" onClick={()=>void loadMyWork()}><Clock3 size={15}/> Refresh</button></div>
+              {myWork.length ? <div className="my-work-list">{myWork.map(card => <button key={card.id} className="my-work-item" onClick={()=>{setActiveNav("Overview"); const b=boards.find(x=>x.id===card.board_id); if(b&&activeWorkspace) void loadBoard(b,activeWorkspace); void openCard(card);}}>
+                <span className="my-work-check">{card.completed_at ? <Check size={13}/> : ""}</span><span className="my-work-copy"><strong>{card.title}</strong><small>{card.workspace_name} · {card.board_name} · {card.list_name}</small></span><span className="my-work-date">{metaFor(card)}</span>
+              </button>)}</div> : <div className="empty-state"><BriefcaseBusiness size={25}/><strong>No assigned work</strong><p>Cards assigned to you will appear here across your workspaces.</p></div>}
+            </section>
+          ) : (
           {loading ? <div className="loading-state"><Loader2 className="spin" size={22}/><span>Loading Exito...</span></div> :
             !board ? <div className="empty-state"><Grid2X2 size={26}/><strong>No board yet</strong><p>This workspace is ready for its first board.</p><button className="primary-button" onClick={createBoard} disabled={saving}><CirclePlus size={16}/> {saving?"Creating...":"Create board"}</button></div> :
             <div className="board">
@@ -399,6 +433,7 @@ export default function Home() {
             </div>
           }
 
+          )}
           <div className="ai-strip"><div className="ai-icon"><Sparkles size={18}/></div><div><strong>Exito AI is coming to the board.</strong><p>Ask what needs attention, create work from a conversation, or let Exito prepare your next action plan.</p></div><button className="secondary-button">Explore AI</button></div>
         </div>
       </section>
