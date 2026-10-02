@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { createClient } from "../../lib/supabase/client";
 
 const COOLDOWN_SECONDS = 60;
+const PRODUCTION_APP_URL = "https://exito-mjbz.vercel.app";
 
 export default function LoginPage() {
   const supabase = createClient();
@@ -29,10 +30,15 @@ export default function LoginPage() {
     setMessage("");
     setSent(false);
 
+    const appOrigin =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+        ? PRODUCTION_APP_URL
+        : window.location.origin;
+
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: new URL("/auth/callback", window.location.origin).toString(),
+        emailRedirectTo: new URL("/auth/callback", appOrigin).toString(),
       },
     });
 
