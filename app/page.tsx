@@ -244,6 +244,23 @@ export default function Home() {
     setSaving(false);
   }
 
+  async function createWorkspace() {
+    if (!orgId || !userId) return;
+    const name = window.prompt("Name your workspace");
+    if (!name?.trim()) return;
+    const slugBase = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const slug = slugBase || `workspace-${Date.now()}`;
+    setSaving(true); setError("");
+    const { data, error: e } = await supabase.from("workspaces").insert({ organization_id: orgId, name: name.trim(), slug, icon: null }).select("id,name,icon").single();
+    if (e) setError(e.message);
+    else if (data) {
+      await supabase.from("workspace_members").insert({ workspace_id: data.id, user_id: userId, role: "owner" });
+      setWorkspaces(prev => [...prev, data]);
+      await loadWorkspace(data);
+    }
+    setSaving(false);
+  }
+
   async function updateBoardSettings() {
     if (!board) return;
     const name = window.prompt("Board name", board.name);
@@ -383,7 +400,7 @@ export default function Home() {
           <button className={activeNav === label ? "nav-item active" : "nav-item"} key={label} onClick={() => setActiveNav(label)}><Icon size={18}/><span>{label}</span></button>
         ))}</nav>
         <div className="side-section">
-          <div className="section-heading"><span>YOUR BUSINESSES</span><CirclePlus size={15}/></div>
+          <div className="section-heading"><span>YOUR BUSINESSES</span><button className="side-add" onClick={()=>void createWorkspace()} aria-label="Create workspace"><CirclePlus size={15}/></button></div>
           {workspaces.map(workspace => {
             const style=workspaceStyle[workspace.name] ?? {initials:initials(workspace.name),tone:"navy"};
             return <button key={workspace.id} className={activeWorkspace?.id===workspace.id?"business active":"business"} onClick={()=>loadWorkspace(workspace)}>
