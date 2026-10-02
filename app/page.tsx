@@ -153,14 +153,16 @@ export default function Home() {
   }
 
   async function loadCardDetails(card: DbCard) {
-    const [commentRes, checklistRes, itemRes, memberRes, activityRes] = await Promise.all([
+    const [commentRes, checklistRes, memberRes, activityRes] = await Promise.all([
       supabase.from("comments").select("id,user_id,body,created_at").eq("card_id", card.id).order("created_at", { ascending: true }),
       supabase.from("checklists").select("id,card_id,name").eq("card_id", card.id).order("created_at", { ascending: true }),
-      supabase.from("checklist_items").select("id,checklist_id,name,is_completed").in("checklist_id",
-        (await supabase.from("checklists").select("id").eq("card_id", card.id)).data?.map(x => x.id) ?? []),
       supabase.from("card_members").select("user_id").eq("card_id", card.id),
       supabase.from("activities").select("id,user_id,action_type,metadata,created_at").eq("card_id", card.id).order("created_at", { ascending: false }).limit(30),
     ]);
+    const checklistIds = (checklistRes.data ?? []).map(x => x.id);
+    const itemRes = checklistIds.length
+      ? await supabase.from("checklist_items").select("id,checklist_id,name,is_completed").in("checklist_id", checklistIds)
+      : { data: [], error: null };
     setComments(commentRes.data ?? []);
     setChecklists(checklistRes.data ?? []);
     setChecklistItems(itemRes.data ?? []);
@@ -240,7 +242,7 @@ export default function Home() {
     const { data, error: e } = await supabase.from("cards").update({ list_id: targetList.id, position, completed_at: completedAt })
       .eq("id", cardId).select("id,board_id,list_id,title,description,position,created_at,due_date,is_archived,completed_at").single();
     if (e) setError(e.message);
-    else if (data) { await logActivity(data, "card_moved", { to_list: targetList.name }); await loadWorkspace(activeWorkspace!); }
+    else if (data) { setSelectedCard(selectedCard?.id === data.id ? data : selectedCard); await logActivity(data, "card_moved", { to_list: targetList.name }); await loadWorkspace(activeWorkspace!); }
     setDragCardId(null);
   }
 
